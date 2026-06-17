@@ -5,4 +5,4 @@
 ## 子页面
 
 - [游侠匿所](/wiki/towers/archer/ranger)
-- [十字弩炮塔](/wiki/towers/archer/crossbow)
+- [弩兵堡垒](/wiki/towers/archer/crossbow)

@@ -14,7 +14,7 @@ marked.use({
       let title = typeof token === 'object' && token !== null ? token.title : arguments[1]
       let text = typeof token === 'object' && token !== null ? token.text : arguments[2]
       if (!/^(https?:\/\/|\/)/.test(href)) {
-        href = '/static/' + href.replace(/^\.\//, '')
+        href = '/static/wiki/' + href.replace(/^\.\//, '')
       }
       const t = title ? ` title="${title}"` : ''
       return `<img src="${href}" alt="${text}"${t}>`

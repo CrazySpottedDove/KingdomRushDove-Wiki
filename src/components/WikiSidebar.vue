@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 interface WikiEntry {
   name: string
+  title: string
   path: string
   is_dir: boolean
   children: WikiEntry[]
@@ -62,12 +63,12 @@ onMounted(async () => {
         <router-link v-if="!e.is_dir" :to="e.path" class="sidebar-link" @click.stop>
           {{ e.name }}
         </router-link>
-        <span v-else class="sidebar-label">{{ e.name }}</span>
+        <span v-else class="sidebar-label">{{ e.title || e.name }}</span>
       </div>
       <div v-if="e.is_dir && expanded.has(e.name)" class="sidebar-children">
         <router-link v-for="child in e.children" :key="child.name" :to="child.path"
           class="sidebar-child" :class="{ active: route.path === child.path }">
-          {{ child.name }}
+          {{ child.title || child.name }}
         </router-link>
         <router-link :to="e.path" class="sidebar-child sidebar-child-index"
           :class="{ active: route.path === e.path }">

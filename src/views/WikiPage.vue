@@ -6,6 +6,22 @@ import DOMPurify from 'dompurify'
 import WikiSidebar from '../components/WikiSidebar.vue'
 
 marked.setOptions({ gfm: true, breaks: false })
+marked.use({
+  renderer: (() => {
+    const r = new marked.Renderer()
+    r.image = function(token: any) {
+      let href = typeof token === 'object' && token !== null ? token.href : token
+      let title = typeof token === 'object' && token !== null ? token.title : arguments[1]
+      let text = typeof token === 'object' && token !== null ? token.text : arguments[2]
+      if (!/^(https?:\/\/|\/)/.test(href)) {
+        href = '/static/' + href.replace(/^\.\//, '')
+      }
+      const t = title ? ` title="${title}"` : ''
+      return `<img src="${href}" alt="${text}"${t}>`
+    }
+    return r
+  })()
+})
 
 const route = useRoute()
 const content = ref('')

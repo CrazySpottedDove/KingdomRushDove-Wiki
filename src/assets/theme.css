@@ -1,0 +1,196 @@
+/* ── KingdomRushDove 公共暗色主题 ────────────────────────────────────────────── */
+
+:root {
+    --bg: #1a1b1e;
+    --surface: #25262b;
+    --border: #373a40;
+    --accent: #4dabf7;
+    --accent2: #69db7c;
+    --warn: #ffa94d;
+    --danger: #ff6b6b;
+    --text: #c1c2c5;
+    --text-dim: #909296;
+    --code-bg: #141517;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0 16px 60px;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Layout ──────────────────────────────────────────────────────────────────── */
+
+.page-wrap { max-width: 960px; margin: 0 auto; }
+
+@media (min-width: 1440px) {
+    .page-wrap { max-width: min(1300px, calc(100vw - 64px)); }
+}
+@media (min-width: 1800px) {
+    .page-wrap { max-width: min(1600px, calc(100vw - 80px)); }
+}
+
+/* ── Site navigation bar ─────────────────────────────────────────────────────── */
+
+.site-nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    margin: 0 -16px;
+    padding: 0 16px;
+}
+.site-nav-inner {
+    max-width: 1680px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    height: 44px;
+    gap: 4px;
+}
+.site-nav-brand {
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.92rem;
+    text-decoration: none;
+    padding: 6px 10px 6px 0;
+    margin-right: 8px;
+    white-space: nowrap;
+    border-right: 1px solid var(--border);
+    padding-right: 14px;
+}
+.site-nav-brand:hover { text-decoration: none; color: var(--accent); }
+.site-nav-links { display: flex; align-items: center; gap: 2px; }
+.site-nav-links a {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: color .15s, background .15s;
+    white-space: nowrap;
+}
+.site-nav-links a:hover { color: #fff; background: rgba(255,255,255,0.07); text-decoration: none; }
+.site-nav-links a.active { color: #fff; font-weight: 600; }
+
+header {
+    padding: 40px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+}
+header h1 { font-size: 2rem; color: #fff; margin-bottom: 6px; }
+header p { color: var(--text-dim); font-size: 0.95rem; }
+
+/* ── Typography ──────────────────────────────────────────────────────────────── */
+
+p { margin-bottom: 10px; }
+ul, ol { padding-left: 22px; margin-bottom: 10px; }
+li { margin: 4px 0; }
+
+h2 { font-size: 1.4rem; color: #fff; }
+h3 { font-size: 1.1rem; color: var(--accent); margin: 24px 0 8px; }
+h4 { font-size: 0.95rem; color: var(--accent2); margin: 16px 0 6px; }
+
+/* ── Code ────────────────────────────────────────────────────────────────────── */
+
+code {
+    font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+    font-size: 0.875rem;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: #ffa8a8;
+}
+pre {
+    font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+    font-size: 0.875rem;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 12px 0 18px;
+    line-height: 1.6;
+}
+pre code { background: none; border: none; padding: 0; color: #ced4da; }
+
+/* ── Tables ──────────────────────────────────────────────────────────────────── */
+
+table { width: 100%; border-collapse: collapse; margin: 14px 0 18px; font-size: 0.88rem; }
+th, td { padding: 9px 14px; border: 1px solid var(--border); }
+th { background: var(--surface); color: #fff; font-weight: 600; text-align: left; }
+tr:nth-child(even) td { background: #1e2025; }
+tr:hover td { background: #1e2025; }
+
+/* ── Callouts ────────────────────────────────────────────────────────────────── */
+
+.callout {
+    border-radius: 8px; padding: 14px 18px; margin: 14px 0;
+    border-left: 4px solid; font-size: 0.92rem;
+}
+.callout.info   { background: #1c3150; border-color: var(--accent); }
+.callout.warn   { background: #3d2a0a; border-color: var(--warn); }
+.callout.danger { background: #3d0f0f; border-color: var(--danger); }
+.callout.tip    { background: #12301e; border-color: var(--accent2); }
+.callout b { color: #fff; }
+
+/* ── Notice bar ──────────────────────────────────────────────────────────────── */
+
+.notice {
+    background: #1c3150;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    font-size: 0.93rem;
+}
+.notice a { font-weight: 600; }
+
+/* ── Form inputs ─────────────────────────────────────────────────────────────── */
+
+input[type="text"],
+input[type="password"],
+input[type="search"],
+input[type="number"] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.9rem;
+    padding: 7px 10px;
+    width: 100%;
+}
+input:focus { outline: none; border-color: var(--accent); }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────── */
+
+.btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.88rem;
+    padding: 7px 16px;
+    transition: border-color .15s, background .15s, color .15s;
+    white-space: nowrap;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); background: #2a2b31; color: #fff; }
+.btn:disabled { opacity: .35; cursor: default; }
+
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+.btn-primary:hover:not(:disabled) { background: #74c0fc; border-color: #74c0fc; color: #000; }
+
+.btn-danger { border-color: var(--danger); color: var(--danger); background: transparent; }
+.btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }

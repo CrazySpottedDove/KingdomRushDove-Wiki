@@ -6,22 +6,6 @@ import DOMPurify from 'dompurify'
 import WikiSidebar from '../components/WikiSidebar.vue'
 
 marked.setOptions({ gfm: true, breaks: false })
-marked.use({
-  renderer: (() => {
-    const r = new marked.Renderer()
-    r.image = function(token: any) {
-      let href = typeof token === 'object' && token !== null ? token.href : token
-      let title = typeof token === 'object' && token !== null ? token.title : arguments[1]
-      let text = typeof token === 'object' && token !== null ? token.text : arguments[2]
-      if (!/^(https?:\/\/|\/)/.test(href)) {
-        href = '/static/wiki/' + href.replace(/^\.\//, '')
-      }
-      const t = title ? ` title="${title}"` : ''
-      return `<img src="${href}" alt="${text}"${t}>`
-    }
-    return r
-  })()
-})
 
 const route = useRoute()
 const content = ref('')
@@ -29,23 +13,18 @@ const loading = ref(true)
 const notFound = ref(false)
 const error = ref('')
 
-const pageTitle = computed(() => {
+// Base path for relative images: same directory as the markdown file
+// e.g. /wiki/heroes/gerald → /static/wiki/heroes/
+const imgBase = computed(() => {
   const parts = route.path.split('/').filter(Boolean)
-  if (parts.length <= 1) return 'Wiki 首页'
-  return parts[parts.length - 1]
+  const relDir = parts.slice(1, -1).join('/')
+  return relDir ? `/static/wiki/${relDir}/` : '/static/wiki/'
 })
 
-function resolveMdPath(): string[] {
-  const parts = route.path.split('/').filter(Boolean)
-  // Remove the first segment ('wiki')
-  const relParts = parts.slice(1)
-  if (relParts.length === 0) return ['index.md']
-  // Build candidate paths
-  const joined = relParts.join('/')
-  return [
-    `${joined}.md`,        // e.g. towers/archer.md
-    `${joined}/index.md`,  // e.g. towers/archer/index.md
-  ]
+function fixImagePaths(html: string): string {
+  return html.replace(/<img\s+src="(?!https?:\/\/|\/)([^"]+)"/gi, (_, src) => {
+    return `<img src="${imgBase.value}${src}"`
+  })
 }
 
 async function fetchPage() {
@@ -61,6 +40,7 @@ async function fetchPage() {
         const md = await resp.text()
         let html = marked.parse(md) as string
         if (DOMPurify) html = DOMPurify.sanitize(html)
+        html = fixImagePaths(html)
         content.value = html
         loading.value = false
         return
@@ -70,6 +50,17 @@ async function fetchPage() {
 
   notFound.value = true
   loading.value = false
+}
+
+function resolveMdPath(): string[] {
+  const parts = route.path.split('/').filter(Boolean)
+  const relParts = parts.slice(1)
+  if (relParts.length === 0) return ['index.md']
+  const joined = relParts.join('/')
+  return [
+    `${joined}.md`,
+    `${joined}/index.md`,
+  ]
 }
 
 watch(() => route.path, fetchPage, { immediate: true })

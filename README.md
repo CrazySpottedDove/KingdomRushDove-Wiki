@@ -1,4 +1,4 @@
-# 开发规范
+# 开发者须知
 
 ## Git 工作流
 
@@ -37,3 +37,7 @@ git add -A && git commit -m "feat: 我的功能"
 git push origin feat/my-feature
 # 在 GitHub 创建 PR → dev
 ```
+
+## Wiki 编写
+
+wiki 目录同该项目 wiki 目录结构，添加文件即可。

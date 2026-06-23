@@ -13,11 +13,9 @@ const page = ref(1)
 const PER_PAGE = 30
 const VISIBLE_PAGES = 7
 const list = ref<Commit[]>([])
-const maxKnownPage = ref(1)
+const totalPages = ref(0)
 const hasMore = ref(false)
 const loading = ref(true)
-
-const totalPages = computed(() => maxKnownPage.value)
 
 const pageButtons = computed(() => {
   const total = totalPages.value
@@ -42,16 +40,15 @@ async function load() {
   loading.value = true
   const res = await fetch(`/commits_history?page=${page.value}&per_page=${PER_PAGE}`)
   const j = await res.json()
+  totalPages.value = j.total_pages
   hasMore.value = j.has_more
-  if (hasMore.value && page.value >= maxKnownPage.value) maxKnownPage.value = page.value + 1
   list.value = j.commits
   loading.value = false
 }
 
 function goTo(n: number) {
-  if (n < 1) return
+  if (n < 1 || n > totalPages.value) return
   page.value = n
-  if (page.value > maxKnownPage.value) maxKnownPage.value = page.value
   load()
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }

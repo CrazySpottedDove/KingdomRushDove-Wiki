@@ -7,6 +7,103 @@ import WikiSidebar from '../components/WikiSidebar.vue'
 
 marked.setOptions({ gfm: true, breaks: false })
 
+marked.use({
+  renderer: {
+    code({ text, lang }) {
+      if (lang === 'tree') {
+        const escaped = text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+        return `<div class="tree">${escaped}</div>\n`
+      }
+      if (lang === 'lua') {
+        return `<pre><code>${highlightLua(text)}</code></pre>\n`
+      }
+      const langClass = lang ? ` class="language-${lang}"` : ''
+      return `<pre><code${langClass}>${escapedCode(text)}</code></pre>\n`
+    }
+  }
+})
+
+function highlightLua(code: string): string {
+  let escaped = code
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  const out: string[] = []
+  let i = 0
+
+  while (i < escaped.length) {
+    if (escaped.substring(i, i + 4) === '--[[') {
+      const end = escaped.indexOf(']]', i + 4)
+      if (end !== -1) {
+        out.push(`<span class="cmt">${escaped.substring(i, end + 2)}</span>`)
+        i = end + 2
+        continue
+      }
+    }
+
+    if (escaped.substring(i, i + 2) === '--') {
+      const end = escaped.indexOf('\n', i)
+      const comment = end !== -1 ? escaped.substring(i, end) : escaped.substring(i)
+      out.push(`<span class="cmt">${comment}</span>`)
+      i += comment.length
+      continue
+    }
+
+    if (escaped[i] === '"' || escaped[i] === "'") {
+      const quote = escaped[i]
+      let j = i + 1
+      while (j < escaped.length) {
+        if (escaped[j] === '\\') { j += 2; continue }
+        if (escaped[j] === quote) { j++; break }
+        j++
+      }
+      out.push(`<span class="str">${escaped.substring(i, j)}</span>`)
+      i = j
+      continue
+    }
+
+    if (/\d/.test(escaped[i]) && (i === 0 || !/[a-zA-Z_]/.test(escaped[i - 1]))) {
+      let j = i
+      while (j < escaped.length && /[\d.eE+\-xXa-fA-F]/.test(escaped[j])) j++
+      out.push(`<span class="num">${escaped.substring(i, j)}</span>`)
+      i = j
+      continue
+    }
+
+    if (/[a-zA-Z_]/.test(escaped[i])) {
+      let j = i
+      while (j < escaped.length && /[a-zA-Z0-9_]/.test(escaped[j])) j++
+      const word = escaped.substring(i, j)
+      const keywords = ['and', 'break', 'do', 'else', 'elseif', 'end', 'false', 'for', 'function', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat', 'return', 'then', 'true', 'until', 'while']
+      if (keywords.includes(word)) {
+        out.push(`<span class="kw">${word}</span>`)
+      } else if (j < escaped.length && escaped[j] === '(') {
+        out.push(`<span class="fn">${word}</span>`)
+      } else {
+        out.push(word)
+      }
+      i = j
+      continue
+    }
+
+    out.push(escaped[i])
+    i++
+  }
+
+  return out.join('')
+}
+
+function escapedCode(code: string): string {
+  return code
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
 const route = useRoute()
 const content = ref('')
 const loading = ref(true)
@@ -119,4 +216,23 @@ watch(() => route.path, fetchPage, { immediate: true })
 .md-body :deep(code) { font-family: "Fira Code", "Cascadia Code", "Consolas", monospace; font-size: 0.875rem; background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; color: #ffa8a8; }
 .md-body :deep(pre) { font-family: "Fira Code", "Cascadia Code", "Consolas", monospace; font-size: 0.875rem; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; overflow-x: auto; margin: 12px 0 18px; line-height: 1.6; }
 .md-body :deep(pre code) { background: none; border: none; padding: 0; color: #ced4da; }
+
+:deep(.kw) { color: #cc99cd; }
+:deep(.fn) { color: #6fb3d2; }
+:deep(.str) { color: #7ec699; }
+:deep(.cmt) { color: #616e88; font-style: italic; }
+:deep(.num) { color: #f08d49; }
+
+:deep(.tree) {
+  font-family: monospace;
+  font-size: 0.875rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  line-height: 1.8;
+  color: #ced4da;
+  margin: 12px 0 18px;
+  white-space: pre-wrap;
+}
 </style>

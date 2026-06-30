@@ -23,7 +23,6 @@ onMounted(async () => {
         <router-link to="/history">📋 更新历史</router-link>
         <router-link to="/plugins">🧩 插件商店</router-link>
         <router-link to="/challenges">🏁 挑战</router-link>
-        <router-link to="/plugin_guide">📖 插件开发文档</router-link>
         <router-link to="/wiki">📰 Wiki</router-link>
       </div>
       <div style="float:right;margin-left:12px;font-size:0.85rem;color:var(--muted);">

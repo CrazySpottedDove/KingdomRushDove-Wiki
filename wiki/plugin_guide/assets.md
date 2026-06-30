@@ -99,7 +99,244 @@ end
 
 ## 音乐资源
 
+Dove 版的音乐资源也通过组(`groups.lua`)来管理。不同的是，音乐资源的组只负责描述需要加载的音乐，而音效的定义在单独的文件中(`sounds.lua`)。
+
+```lua
+-- groups.lua 的结构
+return {
+	-- 键名为声音组名称。为了防止冲突，建议声音组名称添加插件 entry 前缀
+	${entry}_tower_spirit_mausoleum = {
+		-- 定义这个组需要的文件
+		files = {
+			"kr4_fallen_ones_spirit_mausoleum_taunt_1.ogg",
+			"kr4_fallen_ones_spirit_mausoleum_taunt_2.ogg",
+			"kr4_fallen_ones_spirit_mausoleum_taunt_3.ogg",
+			"kr4_fallen_ones_spirit_mausoleum_taunt_4.ogg",
+			"kr4_fallen_ones_spirit_mausoleum_communion_upg.ogg",
+			"kr4_fallen_ones_spirit_mausoleum_possesion_upg.ogg",
+			"kr4_fallen_ones_spirit_mausoleum_gargoyles_upg.ogg",
+			"kr4_fallen_ones_spirit_mausoleum_attack_preload.ogg",
+			"kr4_fallen_ones_spirit_mausoleum_attack.ogg",
+			"kr4_fallen_ones_spirit_mausoleum_possession_cast.ogg",
+			"kr4_fallen_ones_spirit_mausoleum_possession_hit.ogg",
+		},
+		-- 插件声音组独有，用于指定插件声音组的路径
+		parent_dir = "${entry}/assets/sounds",
+	},
+}
+```
+
+```lua
+-- sounds.lua 的结构
+return {
+	-- 音效的名称。为了防止冲突，建议音效名称添加插件 entry 前缀
+	${entry}_ShiningHolyNuclearBuild = {
+		-- 音效对应播放的文件
+		files = { "hero_priest_healing.ogg" },
+		-- 音量百分比
+		gain = 1,
+		-- 是否循环播放
+		loop = false,
+		-- 属于哪一类音效
+		source_group = "TAUNTS",
+	},
+	${entry}_ShiningHolyNuclearHolyBlastUp = {
+		files = { "hero_priest_consecrate.ogg" },
+		gain = 1,
+		loop = false,
+		source_group = "TAUNTS",
+	},
+	${entry}_ShiningHolyNuclearNuclearUp = {
+		files = { "hero_priest_teleport.ogg" },
+		gain = 1,
+		loop = false,
+		source_group = "TAUNTS",
+	},
+}
+```
+
+这里附上所有的声音类型:
+
+```lua
+return {
+	source_groups = {
+		-- 子弹
+		BULLETS = {
+			max_sources = 9,
+		},
+		-- 死亡
+		DEATH = {
+			max_sources = 3,
+		},
+		DEFAULT = {
+			max_sources = 1,
+		},
+		-- 爆炸
+		EXPLOSIONS = {
+			max_sources = 3,
+		},
+		-- UI
+		GUI = {
+			max_sources = 4,
+		},
+		-- 背景音乐
+		MUSIC = {
+			max_sources = 1,
+		},
+		-- 特效音效
+		SFX = {
+			max_sources = 5,
+		},
+		SPECIALS = {
+			max_sources = 5,
+		},
+		-- 近战
+		SWORDS = {
+			max_sources = 1,
+		},
+		-- 类似于防御塔升级、技能升级的音效
+		TAUNTS = {
+			max_sources = 2,
+		},
+		REFCOUNTED = {
+			max_sources = 1000000,
+		},
+	},
+}
+```
+
+一个在插件中加载音乐资源的案例如下：
+
+需求场景：
+
+- 需要在对局中加载 `hero_lilith` 这个声音组。
+- 需要自定义一些音效，音效定义文件为 `assets/sounds/sounds.lua`。
+- 需要自定义一些声音组，并在对局中加载。声音组文件为 `assets/sounds/groups.lua`。
+
+```lua
+-- 在 hook:init() 中
+do
+	-- 选择需求这些音乐资源的场景。
+	-- game: 游戏对局
+	-- screen_map: 大地图
+	local game = require("game")
+
+	-- 加载本体的音乐资源
+	table.arrayensure(game.required_sounds, "hero_lilith")
+
+	-- 追加插件自管理的声音组和音效定义
+	local S = require("sound_db")
+	local groups = require("${entry}.assets.sounds.groups")
+	local sounds = require("${entry}.assets.sounds.sounds")
+
+	S:register_groups(groups)
+	S:register_sounds(sounds)
+
+	-- 释放这两个表的内存，减少 gc 压力
+	package.loaded["${entry}.assets.sounds.groups"] = nil
+	package.loaded["${entry}.assets.sounds.sounds"] = nil
+
+	-- 要求在局内加载的插件的声音组
+	table.arrayensure(game.plugin_required_sounds, "${entry}_some_group_name")
+end
+```
+
 ## 动画资源
+
+动画资源负责定义动画数据。常见的动画数据定义如下：
+
+```lua
+return {
+	-- 动画的名称。为了避免冲突，建议动画名称添加 entry 前缀。
+	${entry}_Amalgam_Attack1_run = {
+		-- 对应 sprite 的前缀。
+		prefix = "Amalgam_Attack1",
+		from = 1,
+		to = 24,
+		-- 该动画对应从 Amalgam_Attack1_0001 到 Amalgam_Attack_0024 的全部 sprite
+	},
+	${entry}_Amalgam_Attack2_run = {
+		prefix = "Amalgam_Attack2",
+		from = 1,
+		to = 25,
+	},
+}
+```
+
+我们建议将动画数据的定义放在 `data/animations.lua` 中。
+
+动画资源的加载通过钩子实现：
+
+首先定义钩子：
+
+```lua
+function hook.A.load(next, self)
+    next(self)
+
+    -- 在 animation_db:load() 调用后，我们追加我们的动画定义
+    local animations = require("${entry}.data.animations")
+    self:register_animations(animations)
+
+    -- 释放内存
+    package.loaded["${entry}.data.animations"]
+end
+```
+
+然后在 `hook:init()` 中：
+
+```lua
+do
+	local A = require("animation_db")
+	hook_utils.HOOK(A, "load", self.A.load)
+end
+```
 
 ## 语言资源
 
+语言资源以 `.lua` 文件的形式存放在 `assets/strings/` 目录下。文件以语言名称命名，例如中文简体为 `zh-Hans.lua`。
+
+语言文件的格式如下：
+
+```lua
+-- ${entry}/assets/strings/zh-Hans.lua
+return {
+	["${entry}_TOWER_NAME"] = "神圣核子塔",
+	["${entry}_TOWER_DESCRIPTION"] = "一座融合了神圣与核子科技的防御塔。",
+	["${entry}_ABILITY_HOLY_BLAST_NAME"] = "神圣冲击",
+	["${entry}_ABILITY_HOLY_BLAST_DESC"] = "释放神圣能量冲击敌人。",
+}
+```
+
+为了防止键名冲突，建议所有语言键名添加 `${entry}_` 前缀。
+
+在插件初始化时，需要将语言资源合并到游戏的国际化系统中。这里区分两个场景。
+
+首先，我们定义一个函数，用于将我们的语言资源合并进本体语言资源中。
+
+```lua
+local function merge_locales(locale)
+	local strings = require("${entry}.assets.strings." .. locale)
+	for k, v in pairs(strings) do
+		i18n.msgs[locale][k] = v
+	end
+	package.loaded["${entry}.assets.strings." .. locale] = nil
+end
+```
+
+然后，我们需要分别在钩子中和 `hook:init()` 中调用这个函数。这是因为， i18n 模块的 `load_locale` 事件在插件初始化前就已经触发，所以需要插件初始化时手动应用一次。
+
+```lua
+function hook.i18n.load_locale(next, locale)
+	next(locale)
+	merge_locales(locale)
+end
+
+-- 在 hook:init() 中
+do
+	merge_locales()
+	local i18n = require("i18n")
+	hook_utils.HOOK(i18n, "load_locale", hook.i18n.load_locale)
+end
+```
+
+注意插件中其他使用这些语言资源的地方，其调用应在语言资源合并之后。

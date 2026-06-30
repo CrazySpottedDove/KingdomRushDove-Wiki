@@ -626,7 +626,6 @@ async function showDetail(entry: string) {
     <div><span>作者</span><br><a href="/developer/${encodeURIComponent(plugin.by)}" target="_blank" style="color:var(--accent2)">${escHtml(plugin.by)}</a></div>
     <div><span>分类</span><br><strong>${cat.icon} ${escHtml(cat.name)}</strong></div>
     <div><span>下载量</span><br><strong>${plugin.downloads}</strong></div>
-    <div><span>兼容版本</span><br><strong>${(plugin.game_version || []).map((g: string) => escHtml(g)).join(', ')}</strong></div>
     <div><span>发布日期</span><br><strong>${fmtDate(plugin.published_at)}</strong></div>`
   detailContentHtml.value = '<div style="text-align:center;padding:20px;color:#666">加载中…</div>'
   showDetailModal.value = true

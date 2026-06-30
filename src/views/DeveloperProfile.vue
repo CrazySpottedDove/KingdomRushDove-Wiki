@@ -527,7 +527,6 @@ onMounted(async () => {
             <div><span>分类</span><br><strong>{{ CATEGORIES.find(c => c.slug === detailPlugin.category)?.icon }} {{ CATEGORIES.find(c => c.slug === detailPlugin.category)?.name }}</strong></div>
             <div><span>下载量</span><br><strong>{{ detailPlugin.downloads }}</strong></div>
             <div><span>点赞数</span><br><strong>{{ detailPlugin.like_count || 0 }}</strong></div>
-            <div><span>兼容版本</span><br><strong>{{ (detailPlugin.game_version || []).join(', ') }}</strong></div>
             <div><span>发布日期</span><br><strong>{{ fmtDate(detailPlugin.published_at) }}</strong></div>
           </div>
           <div class="modal-body" v-html="detailContent"></div>

@@ -15,7 +15,6 @@ export interface Plugin {
   comment_count: number
   published_at: string
   has_cover: boolean
-  game_version?: string[]
 }
 
 export const usePluginStore = defineStore('pluginStore', () => {

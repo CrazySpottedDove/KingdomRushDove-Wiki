@@ -39,6 +39,9 @@ const dayOptions = [1, 3, 7]
 
 const interfaceDescriptions: Record<string, string> = {
   '/': '首页',
+  '/favicon.ico': '网站图标',
+  '/static': '前端静态资源目录',
+  '/static/wiki': 'Wiki 静态资源目录',
   '/api/visits': '访问计数',
   '/api/admin/traffic': '流量控制台 API',
   '/admin/traffic': '流量控制台页面',

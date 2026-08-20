@@ -46,6 +46,7 @@ const regPassword = ref('')
 const userErr = ref('')
 const adminTokenInput = ref('')
 const adminErr = ref('')
+const adminSubmitting = ref(false)
 const collectionName = ref('')
 const collectionDesc = ref('')
 const collectionEntries = ref('')
@@ -447,15 +448,30 @@ function toggleAdmin() {
   nextTick(() => adminTokenInputRef.value?.focus())
 }
 
-function confirmAdmin() {
+async function confirmAdmin() {
   const token = adminTokenInput.value.trim()
   if (!token) {
     adminErr.value = '请输入 Token'
     return
   }
-  auth.setAdminToken(token)
-  showAdminModal.value = false
-  fetchPage()
+  adminSubmitting.value = true
+  adminErr.value = ''
+  try {
+    const resp = await fetch('/api/admin/traffic?hours=1&days=1', {
+      headers: { 'X-Admin-Token': token },
+    })
+    if (!resp.ok) {
+      adminErr.value = resp.status === 401 ? '管理员 Token 不正确' : '验证失败，请稍后重试'
+      return
+    }
+    auth.setAdminToken(token)
+    showAdminModal.value = false
+    fetchPage()
+  } catch {
+    adminErr.value = '网络错误，请稍后重试'
+  } finally {
+    adminSubmitting.value = false
+  }
 }
 
 // ── Upload ──
@@ -1800,7 +1816,9 @@ onUnmounted(() => {
         />
         <div class="modal-btns">
           <button class="btn" @click="closeModal('adminModal')">取消</button>
-          <button class="btn btn-primary" @click="confirmAdmin()">确认</button>
+          <button class="btn btn-primary" :disabled="adminSubmitting" @click="confirmAdmin()">
+            {{ adminSubmitting ? '验证中…' : '确认' }}
+          </button>
         </div>
         <div class="modal-err" id="adminErr">{{ adminErr }}</div>
       </div>

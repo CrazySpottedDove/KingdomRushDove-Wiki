@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 
 interface InterfaceStat {
@@ -17,6 +17,12 @@ interface StatsResponse {
   hourly_total_bytes: number
   daily_total_count: number
   daily_total_bytes: number
+  current_concurrency: number
+  peak_concurrency: number
+}
+
+interface DisplayStat extends InterfaceStat {
+  desc: string
 }
 
 const auth = useAuthStore()
@@ -30,6 +36,103 @@ const adminSubmitting = ref(false)
 
 const hourOptions = [1, 6, 12, 24]
 const dayOptions = [1, 3, 7]
+
+const interfaceDescriptions: Record<string, string> = {
+  '/': '首页',
+  '/api/visits': '访问计数',
+  '/api/admin/traffic': '流量控制台 API',
+  '/admin/traffic': '流量控制台页面',
+  '/commits': '检查游戏更新',
+  '/file': '下载更新文件',
+  '/assets': '资源索引对比',
+  '/assets/download': '下载美术资源',
+  '/assets/upload': '上传美术资源',
+  '/bundle/code': '代码打包更新',
+  '/bundle/assets': '美术资源打包',
+  '/plugins': '插件商店页面',
+  '/plugins/list': '插件列表',
+  '/plugins/upload': '上传插件',
+  '/plugins/download/{filename}': '下载插件',
+  '/plugins/download_patch': '下载插件补丁',
+  '/plugins/hash_check': '插件校验',
+  '/plugins/entries': '插件条目',
+  '/plugins/{entry}': '插件详情',
+  '/plugins/{entry}/readme': '插件说明',
+  '/plugins/{entry}/comments': '插件评论列表',
+  '/plugins/{entry}/comments/{id}': '插件评论操作',
+  '/plugins/{entry}/cover': '插件封面',
+  '/plugins/{entry}/follow': '收藏插件',
+  '/plugins/{entry}/like': '点赞插件',
+  '/plugins/my_likes': '我的点赞',
+  '/plugins/my_follows': '我的收藏',
+  '/plugins/login': '用户登录',
+  '/plugins/register': '用户注册',
+  '/plugins/logout': '用户登出',
+  '/plugins/developer/{username}': '开发者信息',
+  '/plugins/developer/{username}/bio': '开发者简介',
+  '/plugins/comments/upload_image': '上传评论图片',
+  '/plugins/comments/images/{filename}': '评论图片',
+  '/plugin_guide': '插件开发文档',
+  '/changelog': '改版介绍',
+  '/challenges': '挑战页面',
+  '/challenges/list': '挑战列表',
+  '/challenges/{id}': '挑战详情',
+  '/challenges/{id}/like': '挑战点赞',
+  '/challenges/{id}/comments': '挑战评论',
+  '/challenges/my_likes': '我的挑战点赞',
+  '/collections': '插件合集列表',
+  '/collections/{id}': '合集详情',
+  '/collections/{id}/plugins': '合集插件管理',
+  '/collections/{id}/plugins/{entry}': '合集内插件操作',
+  '/collections/{id}/follow': '关注合集',
+  '/collections/{id}/download': '下载合集',
+  '/collections/my_follows': '我关注的合集',
+  '/developers/{username}/follow': '关注开发者',
+  '/developers/my_follows': '我关注的开发者',
+  '/developer/{username}': '开发者主页',
+  '/history': '更新历史页面',
+  '/commits_history': '更新历史 API',
+  '/notifications': '通知列表',
+  '/notifications/read_all': '已读全部通知',
+  '/notifications/settings': '通知设置',
+  '/api/assets/list': '美术资源列表',
+  '/_assets': '美术资源页面',
+  '/_assets/{filename:.*}': '美术资源文件',
+  '/_assets/{_:.*}': '美术资源文件',
+  '/api/users/{username}/avatar': '用户头像',
+  '/api/users/{username}/banner': '用户横幅',
+  '/api/users/{username}/profile': '用户资料',
+  '/api/users/{username}/plugins': '开发者插件列表',
+  '/wiki': 'Wiki 首页',
+  '/wiki/{path:.*}': 'Wiki 页面',
+  '/api/wiki/sidebar': 'Wiki 侧边栏',
+  '/static/{filename:.*}': '前端静态资源',
+  '/static/{_:.*}': '前端静态资源',
+  '/assets/{filename:.*}': '网站静态资源',
+  '/assets/{_:.*}': '网站静态资源',
+  '/static/wiki/{filename:.*}': 'Wiki 静态文件',
+  '/static/wiki/{_:.*}': 'Wiki 静态文件',
+}
+
+function isRemovedInterface(name: string): boolean {
+  return name === '/api/files/list' || name === '/files' || name.startsWith('/files/')
+}
+
+function describeInterface(name: string): string {
+  return interfaceDescriptions[name] || '其他接口'
+}
+
+const displayHourly = computed<DisplayStat[]>(() => {
+  return (data.value?.hourly || [])
+    .filter(item => !isRemovedInterface(item.interface))
+    .map(item => ({ ...item, desc: describeInterface(item.interface) }))
+})
+
+const displayDaily = computed<DisplayStat[]>(() => {
+  return (data.value?.daily || [])
+    .filter(item => !isRemovedInterface(item.interface))
+    .map(item => ({ ...item, desc: describeInterface(item.interface) }))
+})
 
 function fmtBytes(bytes: number): string {
   if (!bytes) return '0 B'
@@ -171,21 +274,30 @@ onMounted(load)
             <div class="stat-label">近{{ data.days }}日总流量</div>
             <div class="stat-value">{{ fmtBytes(data.daily_total_bytes) }}</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-label">当前并发</div>
+            <div class="stat-value">{{ data.current_concurrency }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">并发峰值（启动至今）</div>
+            <div class="stat-value">{{ data.peak_concurrency }}</div>
+          </div>
         </div>
 
         <h2 class="sec">近{{ data.hours }}小时 · 各接口</h2>
         <table>
           <thead>
-            <tr><th>接口</th><th>访问量</th><th>流量</th></tr>
+            <tr><th>接口</th><th>说明</th><th>访问量</th><th>流量</th></tr>
           </thead>
           <tbody>
-            <tr v-for="item in data.hourly" :key="item.interface">
+            <tr v-for="item in displayHourly" :key="item.interface">
               <td><code>{{ item.interface }}</code></td>
+              <td>{{ item.desc }}</td>
               <td>{{ item.count }}</td>
               <td>{{ fmtBytes(item.bytes) }}</td>
             </tr>
-            <tr v-if="data.hourly.length === 0">
-              <td colspan="3" style="text-align:center;color:var(--text-dim);padding:20px">暂无数据</td>
+            <tr v-if="displayHourly.length === 0">
+              <td colspan="4" style="text-align:center;color:var(--text-dim);padding:20px">暂无数据</td>
             </tr>
           </tbody>
         </table>
@@ -193,16 +305,17 @@ onMounted(load)
         <h2 class="sec">近{{ data.days }}日 · 各接口</h2>
         <table>
           <thead>
-            <tr><th>接口</th><th>访问量</th><th>流量</th></tr>
+            <tr><th>接口</th><th>说明</th><th>访问量</th><th>流量</th></tr>
           </thead>
           <tbody>
-            <tr v-for="item in data.daily" :key="item.interface">
+            <tr v-for="item in displayDaily" :key="item.interface">
               <td><code>{{ item.interface }}</code></td>
+              <td>{{ item.desc }}</td>
               <td>{{ item.count }}</td>
               <td>{{ fmtBytes(item.bytes) }}</td>
             </tr>
-            <tr v-if="data.daily.length === 0">
-              <td colspan="3" style="text-align:center;color:var(--text-dim);padding:20px">暂无数据</td>
+            <tr v-if="displayDaily.length === 0">
+              <td colspan="4" style="text-align:center;color:var(--text-dim);padding:20px">暂无数据</td>
             </tr>
           </tbody>
         </table>

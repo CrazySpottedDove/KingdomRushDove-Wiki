@@ -41,10 +41,10 @@
       </router-link>
     </div>
 
-    <h2 class="sec">其他下载渠道</h2>
-    <ul class="qq-list">
-      <li>如果无法使用 IPv6 网络，而 IPv4 下载较慢，可尝试从 <a href="https://pan.quark.cn/s/f79b8c288102?pwd=V2Ec">夸克网盘链接</a> 下载资源。</li>
-    </ul>
+    <h2 class="sec">下载说明</h2>
+    <div class="download-notice">
+      <p>为减轻服务器网络带宽压力，提供更稳定的插件服务和更新服务，现已不支持通过服务器下载游戏本体。可尝试从 <a href="https://pan.quark.cn/s/f79b8c288102?pwd=V2Ec">夸克网盘链接</a>，或进入交流 QQ 群 698678477 获取资源。其余获取渠道均为非官方渠道，不保证时效性和安全性。</p>
+    </div>
 
     <h2 class="sec">赞赏</h2>
     <div class="donate-wrap">
@@ -100,6 +100,16 @@ h2.sec {
 }
 .nav-card .icon { font-size: 1.6rem; margin-bottom: 8px; }
 .nav-card .label { color: #fff; font-size: 0.9rem; font-weight: 600; }
+.download-notice {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 24px;
+  font-size: .95rem;
+  line-height: 1.7;
+}
+.download-notice a { color: var(--accent); }
 .qq-list { list-style: none; padding: 0; }
 .qq-list li {
   background: var(--surface);

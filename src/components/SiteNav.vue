@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useAuthStore } from '../stores/auth'
 
 const visitCount = ref('—')
+const auth = useAuthStore()
 
 onMounted(async () => {
   try {
@@ -23,6 +25,7 @@ onMounted(async () => {
         <router-link to="/plugins">🧩 插件商店</router-link>
         <router-link to="/challenges">🏁 挑战</router-link>
         <router-link to="/wiki">📰 Wiki</router-link>
+        <router-link v-if="auth.isAdmin" to="/admin/traffic">📊 流量控制台</router-link>
       </div>
       <div style="float:right;margin-left:12px;font-size:0.85rem;color:var(--muted);">
         已提供 <span id="visit-count">{{ visitCount }}</span> 次服务

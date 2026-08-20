@@ -43,6 +43,11 @@ const router = createRouter({
       component: () => import('../views/FileListPage.vue'),
     },
     {
+      path: '/admin/traffic',
+      name: 'adminTraffic',
+      component: () => import('../views/AdminTraffic.vue'),
+    },
+    {
       path: '/wiki',
       name: 'wiki',
       component: () => import('../views/WikiPage.vue'),

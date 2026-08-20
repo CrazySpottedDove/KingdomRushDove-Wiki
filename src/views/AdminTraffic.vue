@@ -112,11 +112,11 @@ onMounted(load)
 
     <div v-if="!auth.isAdmin" class="admin-login" style="max-width:420px;margin:24px auto">
       <h2 style="margin-top:0">🔑 管理员验证</h2>
-      <p style="color:var(--text-dim);font-size:.9rem">请输入管理员 Token 以查看流量控制台。</p>
+      <p style="color:var(--text-dim);font-size:.9rem">请输入与插件商店相同的管理员密码以查看流量控制台。</p>
       <input
         v-model="adminTokenInput"
         type="password"
-        placeholder="管理员 Token / 密码"
+        placeholder="管理员密码（与插件商店相同）"
         style="width:100%;box-sizing:border-box;margin:12px 0;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:#fff"
         @keydown.enter="submitAdmin"
       />

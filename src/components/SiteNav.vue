@@ -6,6 +6,7 @@ const visitCount = ref('—')
 const auth = useAuthStore()
 
 onMounted(async () => {
+  await auth.restoreSession()
   try {
     const res = await fetch('/api/visits')
     if (!res.ok) return

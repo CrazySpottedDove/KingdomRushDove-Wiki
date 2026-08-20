@@ -41,6 +41,11 @@
       </router-link>
     </div>
 
+    <h2 class="sec">其他下载渠道</h2>
+    <ul class="qq-list">
+      <li>如果无法使用 IPv6 网络，而 IPv4 下载较慢，可尝试从 <a href="https://pan.quark.cn/s/f79b8c288102?pwd=V2Ec">夸克网盘链接</a> 下载资源。</li>
+    </ul>
+
     <h2 class="sec">赞赏</h2>
     <div class="donate-wrap">
       <p>如果你觉得做得不错，请作者喝杯牢大茶吧，这是对我很好的鼓励！</p>

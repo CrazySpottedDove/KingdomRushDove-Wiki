@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { escHtml } from '../utils/markdown'
 
@@ -28,16 +28,15 @@ const listing = ref<DirListing | null>(null)
 const loading = ref(true)
 const error = ref('')
 
-const isAssets = computed(() => route.path.startsWith('/_assets'))
-const apiBase = computed(() => isAssets.value ? '/api/assets/list' : '/api/files/list')
-const sectionTitle = computed(() => isAssets.value ? '🎨 美术资源' : '📦 下载')
+const apiBase = '/api/assets/list'
+const sectionTitle = '🎨 美术资源'
 
 async function fetchList(subdir = '') {
   loading.value = true
   error.value = ''
   try {
     const params = subdir ? `?path=${encodeURIComponent(subdir)}` : ''
-    const resp = await fetch(`${apiBase.value}${params}`)
+    const resp = await fetch(`${apiBase}${params}`)
     if (!resp.ok) { error.value = '加载失败'; return }
     listing.value = await resp.json()
   } catch { error.value = '网络错误' }
@@ -107,7 +106,7 @@ onMounted(() => {
               <a href="javascript:void(0)" @click="navigateTo(e.name, true)">{{ escHtml(e.name) }}</a>
             </template>
             <template v-else>
-              <a :href="'/' + (isAssets ? '_assets' : 'files') + (listing.path ? '/' + listing.path + '/' + encodeURIComponent(e.name) : '/' + encodeURIComponent(e.name))">{{ escHtml(e.name) }}</a>
+              <a :href="'/_assets' + (listing.path ? '/' + listing.path + '/' + encodeURIComponent(e.name) : '/' + encodeURIComponent(e.name))">{{ escHtml(e.name) }}</a>
             </template>
           </td>
           <td>{{ e.size_str }}</td>

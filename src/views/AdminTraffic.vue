@@ -25,6 +25,8 @@ const days = ref(7)
 const loading = ref(false)
 const error = ref('')
 const data = ref<StatsResponse | null>(null)
+const adminTokenInput = ref('')
+const adminSubmitting = ref(false)
 
 const hourOptions = [1, 6, 12, 24]
 const dayOptions = [1, 3, 7]
@@ -57,7 +59,12 @@ async function load() {
       headers: auth.adminHeaders(),
     })
     if (!resp.ok) {
-      error.value = resp.status === 401 ? '需要管理员 Token' : '加载失败'
+      if (resp.status === 401) {
+        auth.clearAdminToken()
+        error.value = '管理员 Token 无效，请重新输入'
+      } else {
+        error.value = '加载失败'
+      }
       data.value = null
       return
     }
@@ -67,6 +74,20 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+async function submitAdmin() {
+  const token = adminTokenInput.value.trim()
+  if (!token) {
+    error.value = '请输入管理员 Token'
+    return
+  }
+  adminSubmitting.value = true
+  error.value = ''
+  auth.setAdminToken(token)
+  adminTokenInput.value = ''
+  await load()
+  adminSubmitting.value = false
 }
 
 function setHours(v: number) {
@@ -89,11 +110,23 @@ onMounted(load)
       <p>管理员可见：接口访问量 / 流量统计</p>
     </header>
 
-    <div v-if="!auth.isAdmin" class="notice" style="margin:16px 0">
-      当前未进入管理员模式。请先在插件商店页面点击“🔑 管理员”并输入管理员 Token。
+    <div v-if="!auth.isAdmin" class="admin-login" style="max-width:420px;margin:24px auto">
+      <h2 style="margin-top:0">🔑 管理员验证</h2>
+      <p style="color:var(--text-dim);font-size:.9rem">请输入管理员 Token 以查看流量控制台。</p>
+      <input
+        v-model="adminTokenInput"
+        type="password"
+        placeholder="管理员 Token / 密码"
+        style="width:100%;box-sizing:border-box;margin:12px 0;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:#fff"
+        @keydown.enter="submitAdmin"
+      />
+      <button class="btn btn-primary" style="width:100%" :disabled="adminSubmitting" @click="submitAdmin">
+        {{ adminSubmitting ? '验证中…' : '进入控制台' }}
+      </button>
+      <div v-if="error" style="margin-top:12px;color:var(--danger);font-size:.9rem">{{ error }}</div>
     </div>
 
-    <div v-if="error" class="notice" style="margin:16px 0;color:var(--danger)">{{ error }}</div>
+    <div v-else-if="error" class="notice" style="margin:16px 0;color:var(--danger)">{{ error }}</div>
 
     <template v-if="auth.isAdmin">
       <div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;align-items:center">

@@ -38,11 +38,6 @@ const router = createRouter({
       component: () => import('../views/DeveloperProfile.vue'),
     },
     {
-      path: '/files',
-      name: 'files',
-      component: () => import('../views/FileListPage.vue'),
-    },
-    {
       path: '/_assets',
       name: 'assets',
       component: () => import('../views/FileListPage.vue'),

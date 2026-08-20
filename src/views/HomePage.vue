@@ -15,10 +15,6 @@
 
     <h2 class="sec">索引</h2>
     <div class="nav-grid">
-      <a class="nav-card" href="/files">
-        <div class="icon">📦</div>
-        <div class="label">下载</div>
-      </a>
       <a class="nav-card" href="/_assets">
         <div class="icon">🎨</div>
         <div class="label">美术资源</div>
@@ -45,30 +41,6 @@
       </router-link>
     </div>
 
-    <h2 class="sec">如何下载</h2>
-
-    <h3>Windows 端</h3>
-    <ol>
-      <li>进入 <a href="/files/王国保卫战Dove版-Windows端">Windows 端资源页</a>，下载最新版本的压缩包。</li>
-      <li>解压缩下载的文件</li>
-      <li>进入里面的 <code>KingdomRushDove</code> 文件夹，找到 <code>KingdomRushDove版启动器.exe</code>，双击启动。</li>
-      <li>（可选）右键该 exe，选择「创建桌面快捷方式」。</li>
-    </ol>
-
-    <h3>安卓端</h3>
-    <ol>
-      <li>进入 <a href="/files/王国保卫战Dove版-安卓端">安卓端资源页</a>，下载最新版本的 apk。</li>
-      <li>安装 apk。信任该安装包的供应者，无视风险安装。</li>
-      <li>如果您的手机上有老旧的 dove 版本，请手动删除 Love for Android，以免安装失败。老版本存档将消失，此属正常现象。</li>
-    </ol>
-
-    <h3>Linux 端</h3>
-    <ol>
-      <li>进入 <a href="/files/王国保卫战Dove版-Linux端">Linux 端资源页</a>，下载最新版本的压缩包。</li>
-      <li>通过包管理器安装 <code>love</code>。</li>
-      <li>在 <code>KingdomRushDove</code> 目录下执行 <code>love .</code> 启动游戏。</li>
-    </ol>
-
     <h2 class="sec">赞赏</h2>
     <div class="donate-wrap">
       <p>如果你觉得做得不错，请作者喝杯牢大茶吧，这是对我很好的鼓励！</p>
@@ -86,7 +58,6 @@
 
     <h2 class="sec">群聊</h2>
     <ul class="qq-list">
-      <li>如果无法使用 IPv6 网络，而 IPv4 下载较慢，可尝试从 <a href="https://pan.quark.cn/s/f79b8c288102?pwd=V2Ec">夸克网盘链接</a> 下载资源。</li>
       <li>交流 QQ 群（死鱼定期清理）：698678477。</li>
       <li>毁灭者是王国保卫战1代的第一个boss，头上长了2个角。</li>
       <li>如对插件开发有兴趣，可加入 QQ 群 <strong>1025619048</strong>。</li>

@@ -18,7 +18,6 @@ onMounted(async () => {
     <div class="site-nav-inner">
       <router-link class="site-nav-brand" to="/">🏰 KRDove</router-link>
       <div class="site-nav-links">
-        <router-link to="/files">📦 下载</router-link>
         <router-link to="/_assets">🎨 美术资源</router-link>
         <router-link to="/history">📋 更新历史</router-link>
         <router-link to="/plugins">🧩 插件商店</router-link>

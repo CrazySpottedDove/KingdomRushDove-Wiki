@@ -74,4 +74,16 @@ onMounted(async () => {
   font-weight: 600;
 }
 .sidebar-home:hover, .sidebar-home.active { background: var(--surface); }
+
+@media (max-width: 768px) {
+  .wiki-sidebar {
+    position: static;
+    width: 100%;
+    max-height: 40vh;
+    top: auto;
+    overflow-y: auto;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+}
 </style>

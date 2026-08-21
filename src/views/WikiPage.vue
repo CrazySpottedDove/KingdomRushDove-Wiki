@@ -235,4 +235,14 @@ watch(() => route.path, fetchPage, { immediate: true })
   margin: 12px 0 18px;
   white-space: pre-wrap;
 }
+
+@media (max-width: 768px) {
+  .wiki-layout {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .wiki-content {
+    max-width: 100%;
+  }
+}
 </style>

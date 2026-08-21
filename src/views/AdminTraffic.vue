@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import TrafficLineChart from '../components/TrafficLineChart.vue'
 
 interface InterfaceStat {
   interface: string
@@ -158,32 +159,6 @@ function fmtBytes(bytes: number): string {
   return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${units[i]}`
 }
 
-function chartPoints(series: TimePoint[], metric: 'count' | 'bytes'): string {
-  if (!series || series.length === 0) return ''
-  const values = series.map(p => (metric === 'count' ? p.count : p.bytes))
-  const max = Math.max(...values, 1)
-  const w = 600
-  const h = 120
-  const pad = 10
-  const step = series.length > 1 ? (w - pad * 2) / (series.length - 1) : 0
-  return series
-    .map((_, i) => {
-      const x = pad + i * step
-      const y = h - pad - (values[i] / max) * (h - pad * 2)
-      return `${x.toFixed(1)},${y.toFixed(1)}`
-    })
-    .join(' ')
-}
-
-function chartMax(series: TimePoint[], metric: 'count' | 'bytes'): number {
-  if (!series || series.length === 0) return 1
-  return Math.max(...series.map(p => (metric === 'count' ? p.count : p.bytes)), 1)
-}
-
-function fmtAxisValue(v: number, metric: 'count' | 'bytes'): string {
-  return metric === 'count' ? String(v) : fmtBytes(v)
-}
-
 async function load() {
   if (!auth.adminToken) {
     await auth.restoreSession()
@@ -322,44 +297,23 @@ onMounted(load)
           </div>
         </div>
 
-        <div class="charts-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px;margin-bottom:24px">
-          <div class="chart-card">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-              <h3 style="margin:0">逐小时流量</h3>
-              <div class="btn-group">
-                <button class="btn" :class="{ active: chartMetric === 'count' }" @click="chartMetric = 'count'">访问量</button>
-                <button class="btn" :class="{ active: chartMetric === 'bytes' }" @click="chartMetric = 'bytes'">流量</button>
-              </div>
-            </div>
-            <svg viewBox="0 0 620 140" style="width:100%;height:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px">
-              <polyline
-                :points="chartPoints(data.hourly_series, chartMetric)"
-                fill="none"
-                stroke="var(--accent)"
-                stroke-width="2"
-              />
-              <text x="10" y="20" fill="var(--text-dim)" font-size="10">峰值 {{ fmtAxisValue(chartMax(data.hourly_series, chartMetric), chartMetric) }}</text>
-            </svg>
-          </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+          <span style="font-size:.9rem;color:var(--text-dim)">图表指标：</span>
+          <button class="btn" :class="{ active: chartMetric === 'count' }" @click="chartMetric = 'count'">访问量</button>
+          <button class="btn" :class="{ active: chartMetric === 'bytes' }" @click="chartMetric = 'bytes'">流量</button>
+        </div>
 
-          <div class="chart-card">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-              <h3 style="margin:0">逐日流量</h3>
-              <div class="btn-group">
-                <button class="btn" :class="{ active: chartMetric === 'count' }" @click="chartMetric = 'count'">访问量</button>
-                <button class="btn" :class="{ active: chartMetric === 'bytes' }" @click="chartMetric = 'bytes'">流量</button>
-              </div>
-            </div>
-            <svg viewBox="0 0 620 140" style="width:100%;height:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px">
-              <polyline
-                :points="chartPoints(data.daily_series, chartMetric)"
-                fill="none"
-                stroke="var(--accent)"
-                stroke-width="2"
-              />
-              <text x="10" y="20" fill="var(--text-dim)" font-size="10">峰值 {{ fmtAxisValue(chartMax(data.daily_series, chartMetric), chartMetric) }}</text>
-            </svg>
-          </div>
+        <div class="charts-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px;margin-bottom:24px">
+          <TrafficLineChart
+            :series="data.hourly_series"
+            :metric="chartMetric"
+            title="逐小时流量"
+          />
+          <TrafficLineChart
+            :series="data.daily_series"
+            :metric="chartMetric"
+            title="逐日流量"
+          />
         </div>
 
         <h2 class="sec">近{{ data.hours }}小时 · 各接口</h2>
@@ -414,12 +368,6 @@ h2.sec {
   border-color: var(--accent);
   background: #2a2b31;
   color: #fff;
-}
-.chart-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px;
 }
 .stat-card {
   background: var(--surface);

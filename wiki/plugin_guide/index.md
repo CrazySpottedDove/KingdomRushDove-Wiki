@@ -95,5 +95,4 @@ local config = require("${entry}.${entry}_config")
 - [🛠️ 修改模板](templates) — 在插件中修改防御塔、英雄、敌人等实体模板
 - [🎨 资源管理](assets) — 纹理、音乐、语言、数据资源的导入与注册
 - [🔥 热重载](hot_reload) — 不重启游戏应用插件修改（reload / unload / on_config_change）
-
-自制关卡的制作请参阅 [📖 地图制作教程](/wiki/custom_levels/map_creation)。
+- [🗺️ 自制关卡地图制作](custom_levels) — 以恶魔山谷为范例，讲解地图插件的完整结构与制作方法

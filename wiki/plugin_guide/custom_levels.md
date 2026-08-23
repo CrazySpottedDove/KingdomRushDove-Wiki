@@ -56,13 +56,20 @@ return {
 
 ## 二、插件入口 demon_valley.lua
 
-地图插件几乎不需要钩子，入口文件保持最简即可（地图逻辑都在关卡脚本里）：
+地图插件几乎不需要钩子，入口文件保持最简即可（地图逻辑都在关卡脚本里）。为了让地图插件支持热加载 / 热卸载（点「应用」后立即出现在 / 移出「自制关卡」列表），入口文件提供 `reload` 与 `unload` 接口（与游戏内地图编辑器「创建插件地图」生成的模板一致）：
 
 ```lua
 local hook = require("hook_utils"):new()
 
 function hook:init(plugin_data)
 	self.plugin_data = plugin_data
+end
+
+-- 热加载：模块是全新实例，直接复用 init 即可
+hook.reload = hook.init
+
+-- 热卸载：地图插件没有需要撤销的钩子，保持空实现即可
+function hook:unload(plugin_data)
 end
 
 return hook

@@ -88,3 +88,12 @@ local config = require("${entry}.${entry}_config")
 ```
 
 为了命名空间隔离，任何插件目录中独有的文件，在进行 `require` 时，都应该添加 `${entry}.` 前缀。否则，当多个插件中出现同名文件时，可能出现冲突。
+
+## 章节
+
+- [🔌 开发者模式](developer) — 开启上传功能，在游戏内直接上传/更新插件
+- [🛠️ 修改模板](templates) — 在插件中修改防御塔、英雄、敌人等实体模板
+- [🎨 资源管理](assets) — 纹理、音乐、语言、数据资源的导入与注册
+- [🔥 热重载](hot_reload) — 不重启游戏应用插件修改（reload / unload / on_config_change）
+
+自制关卡的制作请参阅 [📖 地图制作教程](/wiki/custom_levels/map_creation)。

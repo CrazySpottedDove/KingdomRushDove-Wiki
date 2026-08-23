@@ -31,7 +31,7 @@
         <div class="icon">🏁</div>
         <div class="label">挑战</div>
       </router-link>
-      <router-link class="nav-card" to="/plugin_guide">
+      <router-link class="nav-card" to="/wiki/plugin_guide">
         <div class="icon">📖</div>
         <div class="label">插件开发文档</div>
       </router-link>

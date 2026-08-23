@@ -29,8 +29,7 @@ const router = createRouter({
     },
     {
       path: '/plugin_guide',
-      name: 'pluginGuide',
-      component: () => import('../views/PluginGuidePage.vue'),
+      redirect: '/wiki/plugin_guide',
     },
     {
       path: '/developer/:username',

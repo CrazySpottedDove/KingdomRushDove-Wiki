@@ -102,6 +102,7 @@ return level
 ## 四、关卡数据 demon_valley_data.lua
 
 ```lua
+--（节选，完整内容见插件实际文件）
 return {
 	entities_list = {
 		-- 塔位：template 为塔座样式，pos 为世界坐标

@@ -11,7 +11,7 @@
 | `init(plugin_data)` | ✅ | 游戏启动 | 原有的启动加载入口 |
 | `reload(plugin_data)` | ❌ | 热加载 | 游戏运行中，插件由「未启用」切换为「启用」并点击「应用」时调用。此时插件模块是全新加载的实例 |
 | `unload(plugin_data)` | ❌ | 热卸载 | 游戏运行中，插件由「启用」切换为「未启用」并点击「应用」时调用。应撤销 `init` 中注册的一切钩子 |
-| `on_config_change(plugin_data)` | ❌ | 配置热加载 | 插件配置（`<entry>_config.lua`）修改并点击「应用」时调用。此时新配置已写入磁盘，插件自行读取并应用 |
+| `on_config_change(new_config)` | ❌ | 配置热加载 | 插件配置（`<entry>_config.lua`）修改并点击「应用」时调用。**参数为新的配置数据**（此时也已写入磁盘），直接应用即可 |
 
 ## 完整示例
 
@@ -37,10 +37,9 @@ function hook:unload(plugin_data)
 	UNHOOK(simulation, "do_tick", hook.simulation.do_tick)
 end
 
--- 可选：配置热加载。新配置已写盘，重新读取并应用即可
-function hook:on_config_change(plugin_data)
-	package.loaded[plugin_data.entry .. "." .. plugin_data.entry .. "_config"] = nil
-	local config = require(plugin_data.entry .. "." .. plugin_data.entry .. "_config")
+-- 可选：配置热加载。参数为新配置数据（同时已写入磁盘），直接应用即可
+function hook:on_config_change(new_config)
+	self.config = new_config
 	-- ... 用新配置更新运行中的逻辑
 end
 
@@ -67,5 +66,5 @@ return hook
 - `init` / `reload` / `unload` 应保持对称：`init` 注册了什么，`unload` 就要撤销什么（HOOK / UNHOOK 成对）。
 - 插件模块在热加载时是**全新执行**的，因此 `reload` 可以直接复用 `init` 的逻辑。
 - 插件通过 `require` 加载的子模块会留在缓存中，热加载不会自动清理；如需让子模块重新执行，请在 `reload` 中自行清除 `package.loaded`。
-- `on_config_change` 触发时新配置已写盘，注意先清理配置模块的 `package.loaded` 缓存再读取，避免拿到旧值。
+- `on_config_change` 的参数就是新的配置数据（同时已写入磁盘），直接应用即可，无需自行重新读取文件；如需插件元数据，使用 `init` 时保存的 `self.plugin_data`。
 - 关卡类插件（`category = "level"`）即使实现了热重载，重启后才会出现在「自制关卡」列表中（列表在启动时扫描），属于预期行为。

@@ -9,7 +9,6 @@
 - [🏰 防御塔](/wiki/towers) — 全系列防御塔数据与平衡调整
 - [⚗️ 科技](/wiki/tech) — 科技树与升级详解
 - [🦸 英雄](/wiki/heroes) — 英雄能力与攻略
-- [🗺️ 自制关卡](/wiki/custom_levels) — 社区自制地图与挑战
 - [🔌 插件开发](/wiki/plugin_guide) — 插件开发、热重载与地图制作
 
 ---

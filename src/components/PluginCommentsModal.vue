@@ -335,7 +335,7 @@ defineExpose({ reload: load })
   </Teleport>
 </template>
 
-<style scoped>
+<style>
 .modal-backdrop {
   display: flex;
   position: fixed;

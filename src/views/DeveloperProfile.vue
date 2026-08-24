@@ -57,6 +57,12 @@ const detailPlugin = ref<any>(null)
 const detailContent = ref('')
 const showDetail = ref(false)
 
+// Comments modal
+const showComments = ref(false)
+const commentsEntry = ref('')
+const commentsTitle = ref('')
+const commentsListHtml = ref('')
+
 // Login modal
 const showLogin = ref(false)
 const loginUser = ref('')
@@ -180,7 +186,7 @@ function changeCoverForEntry(entry: string): Promise<void> {
       if (resp.ok) {
         const coverEl = document.getElementById(`cover-${entry}`)
         if (coverEl) {
-          coverEl.innerHTML = `<img src="/plugins/${encodeURIComponent(entry)}/cover?t=${Date.now()}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`
+          coverEl.innerHTML = `<img src="/plugins/${encodeURIComponent(entry)}/cover?size=thumb&t=${Date.now()}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`
         }
       } else {
         alert(`[${entry}] 封面上传失败：${await resp.text()}`)
@@ -214,6 +220,51 @@ async function batchDelete() {
   }
   alert(`删除完成：成功 ${success} 个，失败 ${failed} 个`)
   if (success > 0) await loadProfile()
+}
+
+// Comments modal
+function renderCommentHtml(c: any): string {
+  const tag = c.tag ? `<span class="comment-tag">${escHtml(c.tag)}</span>` : ''
+  const replies = (c.replies || [])
+    .map((r: any) => `<div style="margin-left:22px;margin-top:6px;padding:6px 10px;background:var(--bg);border-radius:6px;font-size:0.85rem">
+      <strong>${escHtml(r.username)}</strong> <span style="color:var(--text-dim);font-size:0.78rem">${escHtml(r.created_at)}</span>
+      <div style="margin-top:2px">${escHtml(r.content)}</div>
+    </div>`)
+    .join('')
+  return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <strong>${escHtml(c.username)}</strong>${tag}
+      <span style="color:var(--text-dim);font-size:0.78rem">${escHtml(c.created_at)}</span>
+    </div>
+    <div style="margin-top:4px">${escHtml(c.content)}</div>
+    ${replies}
+  </div>`
+}
+
+async function showPluginComments(entry: string, plugin: any) {
+  commentsEntry.value = entry
+  commentsTitle.value = `💬 评论 — ${plugin?.name || entry}`
+  commentsListHtml.value = '<div style="text-align:center;padding:20px;color:var(--text-dim)">加载中…</div>'
+  showComments.value = true
+  try {
+    const resp = await fetch('/plugins/' + encodeURIComponent(entry) + '/comments')
+    if (resp.ok) {
+      const data = await resp.json()
+      if (!data.length) {
+        commentsListHtml.value = '<div style="text-align:center;padding:30px;color:var(--text-dim)">暂无评论</div>'
+      } else {
+        commentsListHtml.value = data.map((c: any) => renderCommentHtml(c)).join('')
+      }
+    } else {
+      commentsListHtml.value = '<div style="text-align:center;padding:30px;color:var(--danger)">加载失败</div>'
+    }
+  } catch {
+    commentsListHtml.value = '<div style="text-align:center;padding:30px;color:var(--danger)">网络错误</div>'
+  }
+}
+
+function closeComments() {
+  showComments.value = false
 }
 
 // Auth
@@ -474,7 +525,7 @@ onMounted(async () => {
           <div v-for="p in devData.plugins" :key="p.entry" class="plugin-card" :data-entry="p.entry" @click="handleCardClick($event, p.entry)" :class="{ 'manage-mode': manageMode, 'selected': selectedPlugins.has(p.entry) }">
             <div class="plugin-card-checkbox">✓</div>
             <template v-if="p.has_cover">
-              <div class="card-cover" :id="'cover-' + escHtml(p.entry)"><img :src="'/plugins/' + encodeURIComponent(p.entry) + '/cover'" alt="" loading="lazy" /></div>
+              <div class="card-cover" :id="'cover-' + escHtml(p.entry)"><img :src="'/plugins/' + encodeURIComponent(p.entry) + '/cover?size=thumb'" alt="" loading="lazy" /></div>
             </template>
             <template v-else>
               <div class="card-cover card-cover-placeholder" :id="'cover-' + escHtml(p.entry)"><span class="cover-icon">{{ CATEGORIES.find(c => c.slug === p.category)?.icon || '📦' }}</span></div>
@@ -506,7 +557,7 @@ onMounted(async () => {
               <div class="card-actions">
                 <button class="btn-sm btn-detail-sm" @click="showPluginDetail(p.entry, p)">📄 详情</button>
                 <a class="btn-sm btn-download-sm" :href="'/plugins/download/' + encodeURIComponent(p.filename)">⬇ 下载</a>
-                <router-link class="btn-sm" to="/plugins" style="border-color:#2d4a6a;color:#74c0fc;background:#12243a">💬 评论</router-link>
+                <button class="btn-sm" style="border-color:#2d4a6a;color:#74c0fc;background:#12243a" @click="showPluginComments(p.entry, p)">💬 评论</button>
               </div>
             </div>
           </div>
@@ -530,6 +581,22 @@ onMounted(async () => {
             <div><span>发布日期</span><br><strong>{{ fmtDate(detailPlugin.published_at) }}</strong></div>
           </div>
           <div class="modal-body" v-html="detailContent"></div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Comments modal -->
+    <Teleport to="body">
+      <div class="modal-backdrop" :class="{ show: showComments }" @click.self="closeComments">
+        <div class="modal wide" style="max-width:720px">
+          <div class="modal-header">
+            <h3>{{ commentsTitle }}</h3>
+            <button class="modal-close" @click="closeComments">×</button>
+          </div>
+          <div class="comments-scroll" style="max-height:60vh;overflow-y:auto;padding:4px 2px" v-html="commentsListHtml"></div>
+          <div style="margin-top:12px;text-align:center;font-size:0.85rem;color:var(--text-dim)">
+            如需发表评论，请到插件商店对应插件页操作。
+          </div>
         </div>
       </div>
     </Teleport>

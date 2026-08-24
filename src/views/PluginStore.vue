@@ -273,7 +273,7 @@ function renderCardHtml(p: any): string {
   const favorited = auth.myFollows.has(p.entry)
   const cat = getCategory(p.category)
   const coverUrl = p.has_cover
-    ? `/plugins/${encodeURIComponent(p.entry)}/cover`
+    ? `/plugins/${encodeURIComponent(p.entry)}/cover?size=thumb`
     : null
   const coverHtml = coverUrl
     ? `<div class="card-cover"><img src="${coverUrl}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span class=cover-icon>${escHtml(cat.icon)}</span>';this.parentElement.classList.add('card-cover-placeholder')" /></div>`
@@ -973,7 +973,7 @@ function changeCover(entry: string) {
       const card = document.getElementById(`card-${entry}`)
       if (card) {
         const img = card.querySelector('.card-cover img') as HTMLImageElement | null
-        const url = `/plugins/${encodeURIComponent(entry)}/cover?t=${Date.now()}`
+        const url = `/plugins/${encodeURIComponent(entry)}/cover?size=thumb&t=${Date.now()}`
         if (img) {
           img.src = url
         } else {

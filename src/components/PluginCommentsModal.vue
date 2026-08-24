@@ -336,6 +336,50 @@ defineExpose({ reload: load })
 </template>
 
 <style scoped>
+.modal-backdrop {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.68);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 28px;
+  max-width: 720px;
+  width: 100%;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  position: relative;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #fff;
+}
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--text-dim);
+  line-height: 1;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.modal-close:hover {
+  color: #fff;
+}
 .comments-scroll { min-height: 80px; }
 .comment { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .comment:last-child { border-bottom: none; }

@@ -341,6 +341,7 @@ function editAvatar() {
     if (!file) return
     const resp = await fetch(`/api/users/${encodeURIComponent(targetUser.value!)}/avatar`, {
       method: 'POST',
+      headers: auth.bearerHeaders(),
       body: file,
     })
     if (resp.ok) await loadProfile()
@@ -358,6 +359,7 @@ function editBanner() {
     if (!file) return
     const resp = await fetch(`/api/users/${encodeURIComponent(targetUser.value!)}/banner`, {
       method: 'POST',
+      headers: auth.bearerHeaders(),
       body: file,
     })
     if (resp.ok) await loadProfile()

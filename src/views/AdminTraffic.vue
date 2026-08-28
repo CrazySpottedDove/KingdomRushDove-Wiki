@@ -58,7 +58,6 @@ const interfaceDescriptions: Record<string, string> = {
   '/commits': '检查游戏更新',
   '/file': '下载更新文件',
   '/assets': '资源索引对比',
-  '/assets/download': '下载美术资源',
   '/assets/upload': '上传美术资源',
   '/bundle/code': '代码打包更新',
   '/bundle/assets': '美术资源打包',

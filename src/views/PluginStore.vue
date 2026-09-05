@@ -1050,10 +1050,12 @@ const packDetailInfoHtml = ref('')
 const packDetailCoverHtml = ref('')
 const packDetailContentHtml = ref('')
 const packDetailCanModify = ref(false)
+const packDetailIsMine = ref(false)
 const packDetailLoading = ref(false)
 
-// pack 创建弹窗（表单）
+// pack 创建/编辑弹窗（表单；编辑复用同一弹窗）
 const showPackCreateModal = ref(false)
+const packEditEntry = ref<string | null>(null)
 const packCreateErr = ref('')
 const packCreateSubmitting = ref(false)
 const packFormName = ref('')
@@ -1378,6 +1380,7 @@ async function packShowDetail(entry: string) {
   packDetailInfoHtml.value = ''
   packDetailCoverHtml.value = ''
   packDetailCanModify.value = false
+  packDetailIsMine.value = false
   packDetailLoading.value = true
   packDetailContentHtml.value =
     '<div style="text-align:center;padding:24px;color:#666">加载中…</div>'
@@ -1397,6 +1400,7 @@ async function packShowDetail(entry: string) {
     packDetailEntry.value = pack.entry || entry
     packDetailTitle.value = pack.name || pack.entry || entry
     packDetailCanModify.value = canModifyPack(pack)
+    packDetailIsMine.value = isMyPack(pack)
     if (pack.has_cover) {
       const url = '/packs/' + encodeURIComponent(packDetailEntry.value) + '/cover?t=' + Date.now()
       packDetailCoverHtml.value =
@@ -1518,7 +1522,9 @@ async function packDeleteEntry(entry: string, name: string) {
     if (resp.ok) {
       packShowNotice(`🗑 已删除整合包「${name}」`)
       packInvalidateMineCache()
+      packEditEntry.value = null
       packCloseModal('packDetailModal')
+      packCloseModal('packCreateModal')
       fetchPacks()
     } else if (resp.status === 401) {
       if (auth.adminToken) auth.clearAdminToken()
@@ -1534,11 +1540,7 @@ async function packDeleteEntry(entry: string, name: string) {
 }
 
 // ── Packs: create (form) ──
-function packOpenCreateModal() {
-  if (!auth.userAuth) {
-    toggleUser()
-    return
-  }
+function packResetCreateForm() {
   packCreateErr.value = ''
   packFormName.value = ''
   packFormVersion.value = '1.0.0'
@@ -1553,6 +1555,55 @@ function packOpenCreateModal() {
   packPickerPage.value = 1
   packPickerItems.value = []
   packPickerTotal.value = 0
+}
+
+function packOpenCreateModal() {
+  if (!auth.userAuth) {
+    toggleUser()
+    return
+  }
+  packEditEntry.value = null
+  packResetCreateForm()
+  showPackCreateModal.value = true
+  packPickerLoad(1)
+}
+
+async function packOpenEditModal(entry: string) {
+  if (!auth.userAuth) {
+    toggleUser()
+    return
+  }
+  // 后端 PUT 仅接受作者 Bearer（entry 不可变），先拉详情校验并取回当前字段
+  let data: any = null
+  try {
+    const resp = await fetch('/packs/' + encodeURIComponent(entry))
+    if (!resp.ok) {
+      alert('加载失败（HTTP ' + resp.status + '）')
+      return
+    }
+    data = await resp.json()
+  } catch (e: any) {
+    alert('加载失败：' + e.message)
+    return
+  }
+  const pack = data?.pack || {}
+  if (!isMyPack(pack)) {
+    alert('只能编辑自己发布的整合包（需以作者账号登录；管理员无法代为编辑）')
+    return
+  }
+  const readme: string = typeof data.readme === 'string' ? data.readme : ''
+  const members: any[] = Array.isArray(data.members) ? data.members : []
+  packEditEntry.value = entry
+  packResetCreateForm()
+  packFormName.value = pack.name || ''
+  packFormVersion.value = pack.version || ''
+  packFormCategory.value = pack.category || 'other'
+  packFormDesc.value = pack.desc || ''
+  packFormReadme.value = readme
+  packFormEntry.value = entry
+  // 全量放入（含已下架，便于在表单中移除）；顺序保持 pack 成员序
+  packMembers.value = members.map((m: any) => String(m.entry || '')).filter(Boolean)
+  packCloseModal('packDetailModal')
   showPackCreateModal.value = true
   packPickerLoad(1)
 }
@@ -1671,19 +1722,22 @@ async function packCreateSubmit() {
     return
   }
   const entry = packFormEntry.value.trim()
-  if (entry && !/^[A-Za-z0-9_-]+$/.test(entry)) {
+  if (!packEditEntry.value && entry && !/^[A-Za-z0-9_-]+$/.test(entry)) {
     packCreateErr.value = 'entry 只能包含字母、数字、下划线或中划线（留空则自动生成）'
     return
   }
+  const editEntry = packEditEntry.value
   packCreateSubmitting.value = true
   try {
     const body: Record<string, unknown> = { name, version, entries }
     if (packFormDesc.value.trim()) body.desc = packFormDesc.value.trim()
     if (packFormReadme.value.trim()) body.readme = packFormReadme.value
     body.category = packFormCategory.value || 'other'
-    if (entry) body.entry = entry
-    const resp = await fetch('/packs/create', {
-      method: 'POST',
+    const url = editEntry ? '/packs/' + encodeURIComponent(editEntry) : '/packs/create'
+    const method = editEntry ? 'PUT' : 'POST'
+    if (!editEntry && entry) body.entry = entry
+    const resp = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json', ...auth.bearerHeaders() } as Record<string, string>,
       body: JSON.stringify(body),
     })
@@ -1697,13 +1751,18 @@ async function packCreateSubmit() {
       packCreateErr.value = '❌ ' + text
       return
     }
-    let createdEntry = ''
-    try {
-      createdEntry = (JSON.parse(text) as any).entry || ''
-    } catch (_) { /* ignore */ }
     packCloseModal('packCreateModal')
+    packEditEntry.value = null
     packInvalidateMineCache()
-    packShowNotice(`✅ 创建成功！整合包 entry = ${createdEntry || name}`, createdEntry || name)
+    if (editEntry) {
+      packShowNotice(`✅ 整合包「${name}」已更新`, editEntry)
+    } else {
+      let createdEntry = ''
+      try {
+        createdEntry = (JSON.parse(text) as any).entry || ''
+      } catch (_) { /* ignore */ }
+      packShowNotice(`✅ 创建成功！整合包 entry = ${createdEntry || name}`, createdEntry || name)
+    }
     fetchPacks()
   } catch (e: any) {
     packCreateErr.value = '❌ 网络错误：' + e.message
@@ -2535,6 +2594,11 @@ watch(
         <div v-if="packDetailCoverHtml" class="pack-detail-cover" v-html="packDetailCoverHtml"></div>
         <div class="readme-plugin-info pack-detail-info" v-html="packDetailInfoHtml"></div>
         <div v-if="packDetailCanModify && !packDetailLoading" class="pack-detail-actions">
+          <button
+            v-if="packDetailIsMine"
+            class="btn-sm btn-pack-edit-sm"
+            @click="packOpenEditModal(packDetailEntry)"
+          >✏️ 编辑整合包</button>
           <span style="flex:1"></span>
           <button
             class="btn-sm btn-danger-sm"
@@ -2554,12 +2618,18 @@ watch(
     >
       <div class="modal large pack-create-modal">
         <div class="modal-header">
-          <h3>🧰 创建整合包（表单）</h3>
+          <h3>{{ packEditEntry ? '✏️ 编辑整合包' : '🧰 创建整合包' }}</h3>
           <button class="modal-close" @click="packCloseModal('packCreateModal')">×</button>
         </div>
         <div class="modal-scroll">
-          <label>entry（可选，留空由服务端自动生成）</label>
-          <input type="text" v-model="packFormEntry" placeholder="pack_my_kit（字母/数字/_/-）" maxlength="64" />
+          <template v-if="packEditEntry">
+            <label>entry（不可修改）</label>
+            <div class="pack-entry-readonly">{{ packEditEntry }}</div>
+          </template>
+          <template v-else>
+            <label>entry（可选，留空由服务端自动生成）</label>
+            <input type="text" v-model="packFormEntry" placeholder="pack_my_kit（字母/数字/_/-）" maxlength="64" />
+          </template>
           <label>名称 *</label>
           <input type="text" v-model="packFormName" placeholder="例如：我的塔防整合包" maxlength="60" />
           <label>版本 *</label>
@@ -2664,7 +2734,7 @@ watch(
         <div class="modal-btns">
           <button class="btn" @click="packCloseModal('packCreateModal')">取消</button>
           <button class="btn btn-primary" :disabled="packCreateSubmitting" @click="packCreateSubmit()">
-            {{ packCreateSubmitting ? '创建中…' : '发布整合包' }}
+            {{ packCreateSubmitting ? (packEditEntry ? '保存中…' : '创建中…') : (packEditEntry ? '保存修改' : '发布整合包') }}
           </button>
         </div>
         <div class="modal-err">{{ packCreateErr }}</div>
@@ -3702,6 +3772,26 @@ watch(
 .btn-pack-cover-sm:hover {
   background: #3d2a10;
   color: #ffc078;
+}
+.btn-pack-edit-sm {
+  border-color: #7c4dff;
+  color: #c4b5fd;
+  background: #221a3a;
+}
+.btn-pack-edit-sm:hover {
+  background: #2d2450;
+  color: #e9ddff;
+}
+.pack-entry-readonly {
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  padding: 8px 10px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+  user-select: all;
 }
 .pack-detail-cover {
   width: 100%;

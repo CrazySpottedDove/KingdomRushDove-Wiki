@@ -103,6 +103,7 @@ const interfaceDescriptions: Record<string, string> = {
   '/packs/entries': '整合包条目',
   '/packs/create': '创建整合包',
   '/packs/upload': '上传整合包',
+  '/packs/{entry} (PUT)': '更新整合包',
   '/packs/{entry}': '整合包详情',
   '/packs/{entry}/cover': '整合包封面',
   '/packs/download/{filename}': '下载整合包',

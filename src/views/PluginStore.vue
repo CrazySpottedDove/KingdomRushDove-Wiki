@@ -1074,14 +1074,6 @@ const packPickerCat = ref('')
 const packPickerLoading = ref(false)
 const _packPickerTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
-// pack 上传弹窗
-const showPackUploadModal = ref(false)
-const packUploadErr = ref('')
-const packUploadSubmitting = ref(false)
-const packUploadFileName = ref('')
-const packUploadBody = ref('')
-const packUploadFileInput = ref<HTMLInputElement | null>(null)
-
 // 操作结果提示（pack 面板内）
 const packNotice = ref<{ text: string; entry?: string } | null>(null)
 let _packNoticeTimer: ReturnType<typeof setTimeout> | null = null
@@ -1114,7 +1106,6 @@ function switchStoreView(view: 'plugins' | 'packs') {
 function packCloseModal(id: string) {
   if (id === 'packDetailModal') showPackDetailModal.value = false
   else if (id === 'packCreateModal') showPackCreateModal.value = false
-  else if (id === 'packUploadModal') showPackUploadModal.value = false
 }
 
 function packOnBackdropClick(e: MouseEvent, id: string) {
@@ -1771,80 +1762,6 @@ async function packCreateSubmit() {
   }
 }
 
-// ── Packs: upload pack.lua ──
-function packOpenUploadModal() {
-  if (!auth.userAuth) {
-    toggleUser()
-    return
-  }
-  packUploadErr.value = ''
-  packUploadBody.value = ''
-  packUploadFileName.value = ''
-  showPackUploadModal.value = true
-  nextTick(() => {
-    if (packUploadFileInput.value) packUploadFileInput.value.value = ''
-  })
-}
-
-function onPackUploadFileSelected(input: HTMLInputElement) {
-  const f = input.files?.[0]
-  if (!f) return
-  if (f.size > 2 * 1024 * 1024) {
-    packUploadErr.value = '文件过大，请控制在 2MB 以内'
-    return
-  }
-  const reader = new FileReader()
-  reader.onload = () => {
-    packUploadBody.value = String(reader.result || '')
-    packUploadFileName.value = f.name
-    packUploadErr.value = ''
-  }
-  reader.readAsText(f)
-}
-
-async function packUploadSubmit() {
-  packUploadErr.value = ''
-  if (!auth.userAuth) {
-    packUploadErr.value = '请先登录'
-    return
-  }
-  const body = packUploadBody.value
-  if (!body.trim()) {
-    packUploadErr.value = '请选择 .lua/.txt 文件，或直接粘贴 pack.lua 内容'
-    return
-  }
-  packUploadSubmitting.value = true
-  try {
-    const resp = await fetch('/packs/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain', ...auth.bearerHeaders() } as Record<string, string>,
-      body,
-    })
-    const text = await resp.text()
-    if (!resp.ok) {
-      if (resp.status === 401) {
-        auth.clearUserAuth()
-        packUploadErr.value = '登录已失效，请重新登录'
-        return
-      }
-      packUploadErr.value = '❌ ' + text
-      return
-    }
-    let entry = ''
-    try {
-      entry = (JSON.parse(text) as any).entry || ''
-    } catch (_) { /* ignore */ }
-    packCloseModal('packUploadModal')
-    packInvalidateMineCache()
-    packShowNotice(`✅ 上传成功！entry = ${entry}`, entry)
-    fetchPacks()
-  } catch (e: any) {
-    packUploadErr.value = '❌ 网络错误：' + e.message
-  } finally {
-    packUploadSubmitting.value = false
-  }
-}
-
 // ── Packs: cover upload (作者对“我的整合包”行内) ──
 function packUploadCover(entry: string) {
   if (!auth.userAuth) {
@@ -1921,7 +1838,6 @@ function onPackKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     packCloseModal('packDetailModal')
     packCloseModal('packCreateModal')
-    packCloseModal('packUploadModal')
   }
 }
 
@@ -2036,7 +1952,6 @@ watch(
       <div class="packs-toolbar">
         <div class="packs-actions">
           <button class="btn btn-pack-create" @click="packOpenCreateModal()">🧰 创建整合包</button>
-          <button class="btn btn-pack-upload" @click="packOpenUploadModal()">📤 上传 pack.lua</button>
           <span class="packs-actions-divider"></span>
           <button class="chip" :class="{ active: packFilter === 'all' }" @click="packSetFilter('all')">全部</button>
           <button
@@ -2738,51 +2653,6 @@ watch(
           </button>
         </div>
         <div class="modal-err">{{ packCreateErr }}</div>
-      </div>
-    </div>
-
-    <!-- Pack upload modal -->
-    <div
-      class="modal-backdrop"
-      :class="{ show: showPackUploadModal }"
-      id="packUploadModal"
-      @click="packOnBackdropClick($event, 'packUploadModal')"
-    >
-      <div class="modal">
-        <div class="modal-header">
-          <h3>📤 上传 pack.lua</h3>
-          <button class="modal-close" @click="packCloseModal('packUploadModal')">×</button>
-        </div>
-        <p style="margin:0 0 12px;font-size:0.85rem;color:var(--text-dim)">
-          选择 .lua/.txt 文件（或先粘贴内容再编辑）。pack.lua 需包含
-          <code>entry/name/version/by/members</code>，成员插件必须已在商店上架；内容会在上传前展示以便核对。
-        </p>
-        <div class="drop-zone" style="position:relative;padding:14px;margin-bottom:10px">
-          <input
-            ref="packUploadFileInput"
-            type="file"
-            accept=".lua,.txt"
-            @change="onPackUploadFileSelected($event.target as HTMLInputElement)"
-            @click="($event.target as HTMLInputElement).value = ''"
-          />
-          <div class="drop-zone-icon" style="font-size:1.4rem">📄</div>
-          <div class="drop-zone-label">{{ packUploadFileName || '拖拽 pack.lua 到此，或点击选择' }}</div>
-        </div>
-        <label>pack.lua 内容（可直接编辑）</label>
-        <textarea
-          v-model="packUploadBody"
-          rows="12"
-          spellcheck="false"
-          placeholder="return { entry = '...', name = '...', version = '1.0.0', members = { ... } }"
-          style="width:100%;background:#111215;border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:0.8rem;resize:vertical"
-        ></textarea>
-        <div class="modal-btns">
-          <button class="btn" @click="packCloseModal('packUploadModal')">取消</button>
-          <button class="btn btn-primary" :disabled="packUploadSubmitting" @click="packUploadSubmit()">
-            {{ packUploadSubmitting ? '上传中…' : '上传发布' }}
-          </button>
-        </div>
-        <div class="modal-err">{{ packUploadErr }}</div>
       </div>
     </div>
 
@@ -3713,14 +3583,6 @@ watch(
 .btn-pack-create:hover {
   background: #2d2450;
   color: #e9ddff;
-}
-.btn-pack-upload {
-  border-color: #2d8ca8;
-  color: #63c9e8;
-  background: #0e2a35;
-}
-.btn-pack-upload:hover {
-  background: #1a4a5e;
 }
 .packs-notice {
   display: flex;

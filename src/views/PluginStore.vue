@@ -1345,7 +1345,7 @@ function packCardHtml(p: any): string {
       </div>
       <div class="card-actions">
         <button class="btn-sm btn-detail-sm" onclick="window.__packShowDetail('${entry}')">📄 详情</button>
-        <a class="btn-sm btn-download-sm" href="/packs/download/${filename}">⬇ pack.lua</a>
+        <a class="btn-sm btn-download-sm" href="/packs/download/${filename}">⬇ 下载(.zip)</a>
         ${coverBtn}${deleteBtn}
       </div>
       <div class="pack-card-hint">游戏内安装可自动补装成员插件并支持更新/卸载</div>
@@ -1457,7 +1457,7 @@ function packJumpToPlugin(entry: string) {
 
 // ── Packs: delete ──
 async function packDeleteEntry(entry: string, name: string) {
-  if (!confirm(`确定删除整合包「${name}」？\npack.lua 与封面将一并删除，此操作不可撤销。`)) return
+  if (!confirm(`确定删除整合包「${name}」？\npack.lua/README 与封面将一并删除，此操作不可撤销。`)) return
   const headers = auth.adminToken
     ? auth.adminHeaders()
     : auth.bearerHeaders()
@@ -1948,8 +1948,8 @@ watch(
           </div>
         </div>
         <p class="pack-install-hint">
-          ⬇ 下载 pack.lua 后，在游戏内「游戏 → 插件管理器 → 商店 → 整合包」安装，
-          可自动补装全部成员插件并支持更新/卸载。
+          在游戏内「游戏 → 插件管理器 → 商店 → 整合包」安装可自动补装全部成员插件并支持更新/卸载；
+          网页端下载为 entry.zip（内含 pack.lua 与 README.md）。
         </p>
       </div>
 
@@ -2465,7 +2465,7 @@ watch(
             v-if="packDetailFilename"
             class="btn-sm btn-download-sm"
             :href="`/packs/download/${encodeURIComponent(packDetailFilename)}`"
-          >⬇ 下载 pack.lua</a>
+          >⬇ 下载 .zip（pack.lua + README）</a>
           <span class="pack-install-hint-inline">游戏内插件商店安装可自动补装全部成员插件并支持更新/卸载</span>
           <span style="flex:1"></span>
           <button

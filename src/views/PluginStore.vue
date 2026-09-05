@@ -1036,6 +1036,7 @@ const packPage = ref(1)
 const packTotal = ref(0)
 const packItems = ref<any[]>([])
 const packFilter = ref<'all' | 'mine'>('all')
+const packListCat = ref('')
 const _packSearchTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 // mine 过滤：服务端不支持按作者分页，整包拉取后本地缓存分页
 let _packMineAll: any[] | null = null
@@ -1057,6 +1058,7 @@ const packCreateErr = ref('')
 const packCreateSubmitting = ref(false)
 const packFormName = ref('')
 const packFormVersion = ref('')
+const packFormCategory = ref('')
 const packFormDesc = ref('')
 const packFormReadme = ref('')
 const packFormEntry = ref('')
@@ -1158,7 +1160,10 @@ async function fetchPacks() {
       if (!auth.userAuth) {
         packFilter.value = 'all'
       } else {
-        const mineAll = await fetchMinePacks()
+        let mineAll = await fetchMinePacks()
+        if (packListCat.value) {
+          mineAll = mineAll.filter((p: any) => p.category === packListCat.value)
+        }
         const pages = Math.max(1, Math.ceil(mineAll.length / PACK_PAGE_SIZE))
         if (packPage.value > pages) packPage.value = pages
         const start = (packPage.value - 1) * PACK_PAGE_SIZE
@@ -1177,6 +1182,7 @@ async function fetchPacks() {
         sort: packSort.value,
       })
       if (packSearch.value.trim()) params.set('q', packSearch.value.trim())
+      if (packListCat.value) params.set('category', packListCat.value)
       const resp = await fetch('/packs/list?' + params.toString())
       if (!resp.ok) throw new Error('HTTP ' + resp.status)
       data = await resp.json()
@@ -1252,6 +1258,13 @@ function packSetFilter(mode: 'all' | 'mine') {
   fetchPacks()
 }
 
+function packSetListCat(cat: string) {
+  if (packListCat.value === cat) return
+  packListCat.value = cat
+  packPage.value = 1
+  fetchPacks()
+}
+
 function onPackSearch() {
   if (_packSearchTimer.value) clearTimeout(_packSearchTimer.value)
   _packSearchTimer.value = setTimeout(() => {
@@ -1309,6 +1322,9 @@ function packCardHtml(p: any): string {
   const pby = escHtml(p.by)
   const version = escHtml(p.version)
   const desc = p.desc ? escHtml(p.desc) : '<span style="color:var(--text-dim)">暂无简介</span>'
+  const cat = getCategory(p.category || 'other')
+  const catName = escHtml(cat.name)
+  const catSlug = escHtml(cat.slug)
   const byUrl = encodeURIComponent(p.by)
   const entryUrl = encodeURIComponent(p.entry)
   const coverHtml = p.has_cover
@@ -1324,6 +1340,9 @@ function packCardHtml(p: any): string {
   return `<div class="plugin-card pack-card" id="pack-card-${entry}">
     ${coverHtml}
     <div class="card-body">
+      <div class="pack-card-cat-row">
+        <span class="card-category cat-${catSlug}">${cat.icon} ${catName}</span>
+      </div>
       <div class="pack-card-title-row">
         <div class="card-title" title="${pname}">${pname}</div>
         <span class="card-version">v${version}</span>
@@ -1386,7 +1405,9 @@ async function packShowDetail(entry: string) {
     const author = pack.by
       ? `<a href="/developer/${encodeURIComponent(pack.by)}" target="_blank" style="color:var(--accent2)">${escHtml(pack.by)}</a>`
       : '—'
+    const cat = getCategory(pack.category || 'other')
     packDetailInfoHtml.value = `<div><span>版本</span><br><strong>${escHtml(pack.version)}</strong></div>
+    <div><span>分类</span><br><strong>${cat.icon} ${escHtml(cat.name)}</strong></div>
     <div><span>作者</span><br>${author}</div>
     <div><span>包含插件</span><br><strong>🧩 ${pack.plugin_count ?? members.length}</strong></div>
     <div><span>下载量</span><br><strong>${pack.downloads ?? 0}</strong></div>
@@ -1521,6 +1542,7 @@ function packOpenCreateModal() {
   packCreateErr.value = ''
   packFormName.value = ''
   packFormVersion.value = '1.0.0'
+  packFormCategory.value = ''
   packFormDesc.value = ''
   packFormReadme.value = ''
   packFormEntry.value = ''
@@ -1565,6 +1587,10 @@ function packSetPickerCat(cat: string) {
   if (packPickerCat.value === cat) return
   packPickerCat.value = cat
   packPickerLoad(1)
+}
+
+function packSetFormCategory(cat: string) {
+  packFormCategory.value = cat === packFormCategory.value ? '' : cat
 }
 
 function onPackPickerSearch() {
@@ -1654,6 +1680,7 @@ async function packCreateSubmit() {
     const body: Record<string, unknown> = { name, version, entries }
     if (packFormDesc.value.trim()) body.desc = packFormDesc.value.trim()
     if (packFormReadme.value.trim()) body.readme = packFormReadme.value
+    body.category = packFormCategory.value || 'other'
     if (entry) body.entry = entry
     const resp = await fetch('/packs/create', {
       method: 'POST',
@@ -1964,6 +1991,22 @@ watch(
           <span>{{ packNotice.text }}</span>
           <button v-if="packNotice.entry" class="btn-sm btn-detail-sm" @click="packShowDetail(packNotice.entry || '')">📄 查看</button>
           <button class="btn-sm" title="关闭" @click="packClearNotice()">×</button>
+        </div>
+        <div class="category-chips pack-cat-chips">
+          <button
+            v-for="c in CATEGORIES"
+            :key="c.slug"
+            type="button"
+            class="chip"
+            :class="[
+              c.slug ? `chip-${c.slug}` : '',
+              { active: packListCat === c.slug }
+            ]"
+            :data-cat="c.slug"
+            @click="packSetListCat(c.slug)"
+          >
+            {{ c.icon }} {{ c.name }}
+          </button>
         </div>
         <div class="search-sort-row">
           <input
@@ -2521,6 +2564,20 @@ watch(
           <input type="text" v-model="packFormName" placeholder="例如：我的塔防整合包" maxlength="60" />
           <label>版本 *</label>
           <input type="text" v-model="packFormVersion" placeholder="1.0.0" maxlength="30" />
+          <label>分类（未选择则默认「其他」）</label>
+          <div class="pack-form-cats">
+            <button
+              v-for="c in CATEGORIES.slice(1)"
+              :key="c.slug"
+              type="button"
+              class="chip"
+              :class="[`chip-${c.slug}`, { active: packFormCategory === c.slug }]"
+              :data-cat="c.slug"
+              @click="packSetFormCategory(c.slug)"
+            >
+              {{ c.icon }} {{ c.name }}
+            </button>
+          </div>
           <label>简介</label>
           <input type="text" v-model="packFormDesc" placeholder="可选，一句话介绍" maxlength="1000" />
           <label>README（Markdown，可选）</label>
@@ -3618,6 +3675,16 @@ watch(
   justify-content: space-between;
   gap: 8px;
 }
+.pack-card-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.pack-card-cat-row .card-category {
+  font-size: 0.72rem;
+  padding: 1px 8px;
+}
 .pack-card-title-row .card-title {
   flex: 1;
   min-width: 0;
@@ -3741,6 +3808,20 @@ watch(
 .pack-picker-cats .chip {
   padding: 2px 10px;
   font-size: 0.78rem;
+}
+.pack-form-cats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.pack-form-cats .chip {
+  padding: 2px 10px;
+  font-size: 0.78rem;
+}
+.pack-cat-chips {
+  margin-bottom: 0;
 }
 .pack-picker-search {
   display: flex;

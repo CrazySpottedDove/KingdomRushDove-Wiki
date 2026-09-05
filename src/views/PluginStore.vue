@@ -1067,6 +1067,7 @@ const packPickerItems = ref<any[]>([])
 const packPickerTotal = ref(0)
 const packPickerPage = ref(1)
 const packPickerSearch = ref('')
+const packPickerCat = ref('')
 const packPickerLoading = ref(false)
 const _packPickerTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
@@ -1443,16 +1444,44 @@ function packMembersHtml(members: any[]): string {
   </div>`
 }
 
-function packJumpToPlugin(entry: string) {
-  // 切回插件商店视图并定位到该插件（复用既有搜索/翻页逻辑，不改插件段）
+async function packJumpToPlugin(entry: string) {
+  // 先关掉整合包详情并切回插件商店视图（不改动插件视图既有列表状态）
+  packCloseModal('packDetailModal')
   storeView.value = 'plugins'
   updateStoreViewUrl('plugins')
-  currentCategory.value = ''
+  // 1) 当前插件列表已含该条目 → 直接打开详情弹窗
+  if (currentItems.value.some(p => p.entry === entry)) {
+    showDetail(entry)
+    return
+  }
+  // 2) 否则批量查询一次（POST /plugins/entries），命中则补入列表并打开详情
+  try {
+    const resp = await fetch('/plugins/entries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: [entry] }),
+    })
+    if (resp.ok) {
+      const data = await resp.json()
+      const item = (data.items || []).find((p: any) => p.entry === entry)
+      if (item) {
+        if (!currentItems.value.some(p => p.entry === entry)) {
+          currentItems.value.unshift(item)
+        }
+        showDetail(entry)
+        return
+      }
+    }
+  } catch (e: any) {
+    // 网络失败走回退路径
+    console.error('packJumpToPlugin /plugins/entries 失败：', e)
+  }
+  // 3) 未命中 → 回退：切到插件商店并把 entry 作为搜索词，提示找不到
   currentSearch.value = entry
   currentPage.value = 1
-  packCloseModal('packDetailModal')
   fetchPage()
   window.scrollTo({ top: 0, behavior: 'smooth' })
+  alert(`插件「${entry}」未在商店上架或查询失败，已切换到插件商店搜索。`)
 }
 
 // ── Packs: delete ──
@@ -1503,6 +1532,7 @@ function packOpenCreateModal() {
   packMembers.value = []
   packMemberManualInput.value = ''
   packPickerSearch.value = ''
+  packPickerCat.value = ''
   packPickerPage.value = 1
   packPickerItems.value = []
   packPickerTotal.value = 0
@@ -1520,6 +1550,7 @@ async function packPickerLoad(page: number) {
       sort: 'newest',
     })
     if (packPickerSearch.value.trim()) params.set('q', packPickerSearch.value.trim())
+    if (packPickerCat.value) params.set('category', packPickerCat.value)
     const resp = await fetch('/plugins/list?' + params.toString())
     if (resp.ok) {
       const data = await resp.json()
@@ -1533,6 +1564,12 @@ async function packPickerLoad(page: number) {
   } finally {
     packPickerLoading.value = false
   }
+}
+
+function packSetPickerCat(cat: string) {
+  if (packPickerCat.value === cat) return
+  packPickerCat.value = cat
+  packPickerLoad(1)
 }
 
 function onPackPickerSearch() {
@@ -2508,6 +2545,22 @@ watch(
           ></textarea>
           <label>成员插件（至少 1 个，下方从商店挑选或手动输入）</label>
           <div class="pack-picker">
+            <div class="pack-picker-cats">
+              <button
+                v-for="c in CATEGORIES"
+                :key="c.slug"
+                type="button"
+                class="chip"
+                :class="[
+                  c.slug ? `chip-${c.slug}` : '',
+                  { active: packPickerCat === c.slug }
+                ]"
+                :data-cat="c.slug"
+                @click="packSetPickerCat(c.slug)"
+              >
+                {{ c.icon }} {{ c.name }}
+              </button>
+            </div>
             <div class="pack-picker-search">
               <input
                 type="search"
@@ -2525,8 +2578,13 @@ watch(
                   :checked="packMembers.includes(p.entry)"
                   @change="packToggleMember(p.entry, ($event.target as HTMLInputElement).checked)"
                 />
-                <span class="pack-picker-name">{{ p.name }}</span>
-                <code class="pack-picker-entry">{{ p.entry }}</code>
+                <span class="pack-picker-item-main">
+                  <span class="pack-picker-name-row">
+                    <span class="pack-picker-name">{{ p.name }}</span>
+                    <code class="pack-picker-entry">{{ p.entry }}</code>
+                  </span>
+                  <span class="pack-picker-item-cat">{{ getCategory(p.category).icon }} {{ getCategory(p.category).name }}</span>
+                </span>
               </label>
               <div v-if="packPickerItems.length === 0" class="pack-picker-empty">没有更多插件</div>
             </div>
@@ -3690,6 +3748,17 @@ watch(
   background: var(--bg);
   margin-bottom: 6px;
 }
+.pack-picker-cats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.pack-picker-cats .chip {
+  padding: 2px 10px;
+  font-size: 0.78rem;
+}
 .pack-picker-search {
   display: flex;
   align-items: center;
@@ -3706,7 +3775,7 @@ watch(
   white-space: nowrap;
 }
 .pack-picker-list {
-  max-height: 180px;
+  max-height: 200px;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -3715,9 +3784,9 @@ watch(
 }
 .pack-picker-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  padding: 4px 2px;
+  padding: 5px 2px;
   cursor: pointer;
   border-bottom: 1px solid rgba(55, 58, 64, 0.4);
   font-size: 0.85rem;
@@ -3726,7 +3795,21 @@ watch(
   border-bottom: none;
 }
 .pack-picker-item input {
-  margin: 0;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+}
+.pack-picker-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pack-picker-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 .pack-picker-name {
   color: var(--text);
@@ -3742,6 +3825,12 @@ watch(
   background: #1a1b20;
   padding: 1px 6px;
   border-radius: 4px;
+  flex-shrink: 0;
+}
+.pack-picker-item-cat {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  opacity: 0.85;
 }
 .pack-picker-empty {
   color: var(--text-dim);

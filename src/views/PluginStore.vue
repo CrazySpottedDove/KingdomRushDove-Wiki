@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { escHtml, mdToHtml } from '../utils/markdown'
 import PluginCommentsModal from '../components/PluginCommentsModal.vue'
@@ -1020,13 +1020,852 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
 })
+
+// ── Packs ────────────────────────────────────────────────────────────────────
+// 整合包（Pack）子视图：同页切换（?view=packs）。以下全部为新增独立段，
+// 不影响上方插件视图任何既有逻辑。全局回调统一使用 __pack* 前缀。
+const PACK_PAGE_SIZE = 15
+const PACK_PICKER_LIMIT = 20
+
+const storeView = ref<'plugins' | 'packs'>(getInitialStoreView())
+const packGridRef = ref<HTMLElement | null>(null)
+const packPaginationRef = ref<HTMLElement | null>(null)
+const packSort = ref<'newest' | 'downloads' | 'hot'>('newest')
+const packSearch = ref('')
+const packPage = ref(1)
+const packTotal = ref(0)
+const packItems = ref<any[]>([])
+const packFilter = ref<'all' | 'mine'>('all')
+const _packSearchTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+// mine 过滤：服务端不支持按作者分页，整包拉取后本地缓存分页
+let _packMineAll: any[] | null = null
+let _packMineKey = ''
+
+// pack 详情弹窗
+const showPackDetailModal = ref(false)
+const packDetailTitle = ref('')
+const packDetailEntry = ref('')
+const packDetailFilename = ref('')
+const packDetailInfoHtml = ref('')
+const packDetailCoverHtml = ref('')
+const packDetailContentHtml = ref('')
+const packDetailCanModify = ref(false)
+const packDetailLoading = ref(false)
+
+// pack 创建弹窗（表单）
+const showPackCreateModal = ref(false)
+const packCreateErr = ref('')
+const packCreateSubmitting = ref(false)
+const packFormName = ref('')
+const packFormVersion = ref('')
+const packFormDesc = ref('')
+const packFormReadme = ref('')
+const packFormEntry = ref('')
+const packMembers = ref<string[]>([])
+const packMemberManualInput = ref('')
+const packPickerItems = ref<any[]>([])
+const packPickerTotal = ref(0)
+const packPickerPage = ref(1)
+const packPickerSearch = ref('')
+const packPickerLoading = ref(false)
+const _packPickerTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+
+// pack 上传弹窗
+const showPackUploadModal = ref(false)
+const packUploadErr = ref('')
+const packUploadSubmitting = ref(false)
+const packUploadFileName = ref('')
+const packUploadBody = ref('')
+const packUploadFileInput = ref<HTMLInputElement | null>(null)
+
+// 操作结果提示（pack 面板内）
+const packNotice = ref<{ text: string; entry?: string } | null>(null)
+let _packNoticeTimer: ReturnType<typeof setTimeout> | null = null
+
+function getInitialStoreView(): 'plugins' | 'packs' {
+  try {
+    if (new URLSearchParams(window.location.search).get('view') === 'packs') return 'packs'
+  } catch (_) { /* ignore */ }
+  return 'plugins'
+}
+
+function updateStoreViewUrl(view: 'plugins' | 'packs') {
+  try {
+    const url = new URL(window.location.href)
+    if (view === 'packs') url.searchParams.set('view', 'packs')
+    else url.searchParams.delete('view')
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+  } catch (_) { /* ignore */ }
+}
+
+function switchStoreView(view: 'plugins' | 'packs') {
+  if (storeView.value === view) return
+  storeView.value = view
+  updateStoreViewUrl(view)
+  if (view === 'packs') {
+    fetchPacks()
+  }
+}
+
+function packCloseModal(id: string) {
+  if (id === 'packDetailModal') showPackDetailModal.value = false
+  else if (id === 'packCreateModal') showPackCreateModal.value = false
+  else if (id === 'packUploadModal') showPackUploadModal.value = false
+}
+
+function packOnBackdropClick(e: MouseEvent, id: string) {
+  if (e.target === e.currentTarget) packCloseModal(id)
+}
+
+function packShowNotice(text: string, entry?: string) {
+  packNotice.value = { text, entry }
+  if (_packNoticeTimer) clearTimeout(_packNoticeTimer)
+  _packNoticeTimer = setTimeout(() => {
+    packNotice.value = null
+    _packNoticeTimer = null
+  }, 10000)
+}
+
+function packClearNotice() {
+  packNotice.value = null
+  if (_packNoticeTimer) {
+    clearTimeout(_packNoticeTimer)
+    _packNoticeTimer = null
+  }
+}
+
+function packInvalidateMineCache() {
+  _packMineAll = null
+  _packMineKey = ''
+}
+
+function isMyPack(p: any) {
+  return !!auth.userAuth && !!p && p.by === auth.userAuth.username
+}
+
+function canModifyPack(p: any) {
+  return !!auth.adminToken || isMyPack(p)
+}
+
+// ── Packs: fetch / render grid (window-callback pattern，参照插件网格) ──
+async function fetchPacks() {
+  const grid = packGridRef.value
+  if (!grid) return
+  grid.innerHTML =
+    '<div class="grid-loading" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">加载中…</div>'
+  try {
+    if (packFilter.value === 'mine') {
+      if (!auth.userAuth) {
+        packFilter.value = 'all'
+      } else {
+        const mineAll = await fetchMinePacks()
+        const pages = Math.max(1, Math.ceil(mineAll.length / PACK_PAGE_SIZE))
+        if (packPage.value > pages) packPage.value = pages
+        const start = (packPage.value - 1) * PACK_PAGE_SIZE
+        packItems.value = mineAll.slice(start, start + PACK_PAGE_SIZE)
+        packTotal.value = mineAll.length
+        renderPackGrid()
+        renderPackPagination(packTotal.value, pages)
+        return
+      }
+    }
+    let data: any = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const params = new URLSearchParams({
+        page: String(packPage.value),
+        limit: String(PACK_PAGE_SIZE),
+        sort: packSort.value,
+      })
+      if (packSearch.value.trim()) params.set('q', packSearch.value.trim())
+      const resp = await fetch('/packs/list?' + params.toString())
+      if (!resp.ok) throw new Error('HTTP ' + resp.status)
+      data = await resp.json()
+      packTotal.value = data.total || 0
+      const pages = Math.max(1, Math.ceil(packTotal.value / PACK_PAGE_SIZE))
+      if (packPage.value > pages) {
+        // 删除/搜索后当前页可能越界：回退到最后一页重新拉取
+        packPage.value = pages
+        continue
+      }
+      break
+    }
+    packItems.value = data?.items || []
+    renderPackGrid()
+    renderPackPagination(packTotal.value, Math.max(1, Math.ceil(packTotal.value / PACK_PAGE_SIZE)))
+  } catch (e: any) {
+    grid.innerHTML =
+      '<div class="grid-empty" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">📦 加载失败，请刷新重试</div>'
+    renderPackPagination(0, 1)
+  }
+}
+
+async function fetchMinePacks(): Promise<any[]> {
+  const key = packSort.value + '|' + packSearch.value.trim().toLowerCase()
+  if (_packMineAll && _packMineKey === key) return _packMineAll
+  const mine: any[] = []
+  let page = 1
+  const limit = 50
+  for (let guard = 0; guard < 12; guard++) {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      sort: packSort.value,
+    })
+    if (packSearch.value.trim()) params.set('q', packSearch.value.trim())
+    try {
+      const resp = await fetch('/packs/list?' + params.toString())
+      if (!resp.ok) break
+      const data = await resp.json()
+      const items: any[] = data.items || []
+      const me = auth.userAuth?.username
+      for (const p of items) {
+        if (p.by === me) mine.push(p)
+      }
+      const total: number = data.total || 0
+      if (items.length === 0 || page * limit >= total) break
+      page++
+    } catch {
+      break
+    }
+  }
+  _packMineAll = mine
+  _packMineKey = key
+  return mine
+}
+
+function packSetSort(mode: 'newest' | 'downloads' | 'hot') {
+  if (packSort.value === mode) return
+  packSort.value = mode
+  packPage.value = 1
+  packInvalidateMineCache()
+  fetchPacks()
+}
+
+function packSetFilter(mode: 'all' | 'mine') {
+  if (packFilter.value === mode) return
+  if (mode === 'mine' && !auth.userAuth) {
+    toggleUser()
+    return
+  }
+  packFilter.value = mode
+  packPage.value = 1
+  fetchPacks()
+}
+
+function onPackSearch() {
+  if (_packSearchTimer.value) clearTimeout(_packSearchTimer.value)
+  _packSearchTimer.value = setTimeout(() => {
+    packPage.value = 1
+    packInvalidateMineCache()
+    fetchPacks()
+  }, 400)
+}
+
+function packSetPage(p: number) {
+  if (p < 1) return
+  packPage.value = p
+  fetchPacks()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function renderPackGrid() {
+  const grid = packGridRef.value
+  if (!grid) return
+  if (!packItems.value.length) {
+    grid.innerHTML =
+      '<div class="grid-empty" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">📦 暂无整合包</div>'
+    return
+  }
+  grid.innerHTML = packItems.value.map(p => packCardHtml(p)).join('')
+}
+
+function renderPackPagination(total: number, pages: number) {
+  const el = packPaginationRef.value
+  if (!el) return
+  if (pages <= 1) {
+    el.innerHTML = ''
+    return
+  }
+  const show = new Set(
+    [1, pages, packPage.value, packPage.value - 1, packPage.value + 1]
+      .filter(p => p >= 1 && p <= pages),
+  )
+  const sorted = [...show].sort((a, b) => a - b)
+  let html = `<button class="page-btn" onclick="window.__packSetPage(${packPage.value - 1})" ${packPage.value === 1 ? 'disabled' : ''}>‹</button>`
+  let prev = 0
+  for (const p of sorted) {
+    if (p - prev > 1) html += '<span class="page-ellipsis">…</span>'
+    html += `<button class="page-btn${p === packPage.value ? ' active' : ''}" onclick="window.__packSetPage(${p})">${p}</button>`
+    prev = p
+  }
+  html += `<button class="page-btn" onclick="window.__packSetPage(${packPage.value + 1})" ${packPage.value === pages ? 'disabled' : ''}>›</button>`
+  html += `<span style="font-size:0.8rem;color:var(--text-dim);margin-left:6px">共 ${total} 个</span>`
+  el.innerHTML = html
+}
+
+function packCardHtml(p: any): string {
+  const entry = escHtml(p.entry)
+  const pname = escHtml(p.name)
+  const pby = escHtml(p.by)
+  const version = escHtml(p.version)
+  const desc = p.desc ? escHtml(p.desc) : '<span style="color:var(--text-dim)">暂无简介</span>'
+  const byUrl = encodeURIComponent(p.by)
+  const entryUrl = encodeURIComponent(p.entry)
+  const filename = encodeURIComponent(p.filename || p.entry + '.lua')
+  const coverHtml = p.has_cover
+    ? `<div class="card-cover"><img src="/packs/${entryUrl}/cover" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span class=cover-icon>📦</span>';this.parentElement.classList.add('card-cover-placeholder')" /></div>`
+    : `<div class="card-cover card-cover-placeholder"><span class="cover-icon">📦</span></div>`
+  const mine = isMyPack(p)
+  const deleteBtn = canModifyPack(p)
+    ? `<button class="btn-sm btn-danger-sm" onclick="window.__packDelete('${entry}')">🗑 删除</button>`
+    : ''
+  const coverBtn = mine
+    ? `<button class="btn-sm btn-pack-cover-sm" onclick="window.__packCover('${entry}')">🎨 封面</button>`
+    : ''
+  return `<div class="plugin-card pack-card" id="pack-card-${entry}">
+    ${coverHtml}
+    <div class="card-body">
+      <div class="pack-card-title-row">
+        <div class="card-title" title="${pname}">${pname}</div>
+        <span class="card-version">v${version}</span>
+      </div>
+      <div class="card-author">
+        <a href="/developer/${byUrl}" class="author-avatar-link" title="进入 ${pby} 的主页">
+          <img src="/api/users/${byUrl}/avatar" alt="${pby}" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='👤';" />
+        </a>
+        <a href="/developer/${byUrl}" class="author-link" title="查看${pby}的主页">${pby}</a>
+      </div>
+      <div class="card-desc">${desc}</div>
+    </div>
+    <div class="card-footer">
+      <div class="card-stats">
+        <span title="包含插件数">🧩 ${p.plugin_count || 0} 个插件</span>
+        <span title="下载量">⬇ ${p.downloads || 0}</span>
+        <span title="发布日期">📅 ${fmtDate(p.published_at)}</span>
+      </div>
+      <div class="card-actions">
+        <button class="btn-sm btn-detail-sm" onclick="window.__packShowDetail('${entry}')">📄 详情</button>
+        <a class="btn-sm btn-download-sm" href="/packs/download/${filename}">⬇ pack.lua</a>
+        ${coverBtn}${deleteBtn}
+      </div>
+      <div class="pack-card-hint">游戏内安装可自动补装成员插件并支持更新/卸载</div>
+    </div>
+  </div>`
+}
+
+// ── Packs: detail modal ──
+async function packShowDetail(entry: string) {
+  const local = packItems.value.find(p => p.entry === entry)
+  packDetailTitle.value = local?.name || entry
+  packDetailEntry.value = entry
+  packDetailFilename.value = ''
+  packDetailInfoHtml.value = ''
+  packDetailCoverHtml.value = ''
+  packDetailCanModify.value = false
+  packDetailLoading.value = true
+  packDetailContentHtml.value =
+    '<div style="text-align:center;padding:24px;color:#666">加载中…</div>'
+  showPackDetailModal.value = true
+  try {
+    const resp = await fetch('/packs/' + encodeURIComponent(entry))
+    if (!resp.ok) {
+      packDetailContentHtml.value =
+        '<p style="color:var(--danger);text-align:center">加载失败（HTTP ' + resp.status + '）</p>'
+      packDetailLoading.value = false
+      return
+    }
+    const data = await resp.json()
+    const pack = data.pack || {}
+    const readme: string = typeof data.readme === 'string' ? data.readme : ''
+    const members: any[] = Array.isArray(data.members) ? data.members : []
+    packDetailEntry.value = pack.entry || entry
+    packDetailFilename.value = pack.filename || ''
+    packDetailTitle.value = pack.name || pack.entry || entry
+    packDetailCanModify.value = canModifyPack(pack)
+    if (pack.has_cover) {
+      const url = '/packs/' + encodeURIComponent(packDetailEntry.value) + '/cover?t=' + Date.now()
+      packDetailCoverHtml.value =
+        `<img src="${url}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'" />`
+    }
+    const author = pack.by
+      ? `<a href="/developer/${encodeURIComponent(pack.by)}" target="_blank" style="color:var(--accent2)">${escHtml(pack.by)}</a>`
+      : '—'
+    packDetailInfoHtml.value = `<div><span>版本</span><br><strong>${escHtml(pack.version)}</strong></div>
+    <div><span>作者</span><br>${author}</div>
+    <div><span>包含插件</span><br><strong>🧩 ${pack.plugin_count ?? members.length}</strong></div>
+    <div><span>下载量</span><br><strong>${pack.downloads ?? 0}</strong></div>
+    <div><span>发布日期</span><br><strong>${fmtDate(pack.published_at)}</strong></div>
+    <div><span>entry</span><br><strong>${escHtml(pack.entry)}</strong></div>`
+    let readmeHtml: string
+    if (readme.trim()) {
+      readmeHtml = mdToHtml(readme)
+    } else if (pack.desc) {
+      readmeHtml = `<div class="pack-desc-fallback">${escHtml(pack.desc)}</div>`
+    } else {
+      readmeHtml = '<p style="color:var(--text-dim);text-align:center">作者暂未提供简介。</p>'
+    }
+    packDetailContentHtml.value = readmeHtml + packMembersHtml(members)
+    packDetailLoading.value = false
+  } catch (e: any) {
+    packDetailContentHtml.value =
+      '<p style="color:var(--danger);text-align:center">加载失败：' + escHtml(e?.message || String(e)) + '</p>'
+    packDetailLoading.value = false
+  }
+}
+
+function packMembersHtml(members: any[]): string {
+  if (!members.length) return ''
+  const rows = members.map(m => {
+    const mentry = escHtml(m.entry || '')
+    const displayName = m.name ? escHtml(m.name) : mentry
+    const version = m.exists ? (m.version ? escHtml(m.version) : '—') : '—'
+    const author = m.exists
+      ? (m.author
+          ? `<a href="/developer/${encodeURIComponent(m.author)}" target="_blank" style="color:var(--accent2)">${escHtml(m.author)}</a>`
+          : '—')
+      : '—'
+    const downloads = m.exists ? (m.downloads ?? 0) : '—'
+    const offBadge = m.exists ? '' : ' <span class="pack-off-badge">已下架</span>'
+    const viewBtn = m.exists
+      ? `<button class="btn-sm btn-detail-sm" onclick="window.__packJumpToPlugin('${mentry}')">查看插件</button>`
+      : ''
+    return `<tr>
+      <td><span class="pack-member-name">${displayName}</span>${offBadge}<div class="pack-member-entry">${mentry}</div></td>
+      <td>${version}</td><td>${author}</td><td>${downloads}</td><td>${viewBtn}</td>
+    </tr>`
+  }).join('')
+  return `<div class="pack-members-block">
+    <div class="pack-members-title">🧩 成员插件（${members.length}）</div>
+    <div class="pack-table-wrap"><table class="pack-member-table">
+      <thead><tr><th>插件</th><th>版本</th><th>作者</th><th>下载量</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`
+}
+
+function packJumpToPlugin(entry: string) {
+  // 切回插件商店视图并定位到该插件（复用既有搜索/翻页逻辑，不改插件段）
+  storeView.value = 'plugins'
+  updateStoreViewUrl('plugins')
+  currentCategory.value = ''
+  currentSearch.value = entry
+  currentPage.value = 1
+  packCloseModal('packDetailModal')
+  fetchPage()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// ── Packs: delete ──
+async function packDeleteEntry(entry: string, name: string) {
+  if (!confirm(`确定删除整合包「${name}」？\npack.lua 与封面将一并删除，此操作不可撤销。`)) return
+  const headers = auth.adminToken
+    ? auth.adminHeaders()
+    : auth.bearerHeaders()
+  if (!auth.adminToken && !auth.userAuth) {
+    toggleUser()
+    return
+  }
+  try {
+    const resp = await fetch('/packs/' + encodeURIComponent(entry), {
+      method: 'DELETE',
+      headers: headers as Record<string, string>,
+    })
+    if (resp.ok) {
+      packShowNotice(`🗑 已删除整合包「${name}」`)
+      packInvalidateMineCache()
+      packCloseModal('packDetailModal')
+      fetchPacks()
+    } else if (resp.status === 401) {
+      if (auth.adminToken) auth.clearAdminToken()
+      else auth.clearUserAuth()
+      packCloseModal('packDetailModal')
+      alert('认证已失效，请重新登录')
+    } else {
+      alert('删除失败：' + (await resp.text()))
+    }
+  } catch (e: any) {
+    alert('删除失败：' + e.message)
+  }
+}
+
+// ── Packs: create (form) ──
+function packOpenCreateModal() {
+  if (!auth.userAuth) {
+    toggleUser()
+    return
+  }
+  packCreateErr.value = ''
+  packFormName.value = ''
+  packFormVersion.value = '1.0.0'
+  packFormDesc.value = ''
+  packFormReadme.value = ''
+  packFormEntry.value = ''
+  packMembers.value = []
+  packMemberManualInput.value = ''
+  packPickerSearch.value = ''
+  packPickerPage.value = 1
+  packPickerItems.value = []
+  packPickerTotal.value = 0
+  showPackCreateModal.value = true
+  packPickerLoad(1)
+}
+
+async function packPickerLoad(page: number) {
+  packPickerLoading.value = true
+  packPickerItems.value = []
+  try {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(PACK_PICKER_LIMIT),
+      sort: 'newest',
+    })
+    if (packPickerSearch.value.trim()) params.set('q', packPickerSearch.value.trim())
+    const resp = await fetch('/plugins/list?' + params.toString())
+    if (resp.ok) {
+      const data = await resp.json()
+      packPickerItems.value = data.items || []
+      packPickerTotal.value = data.total || 0
+      packPickerPage.value = page
+    }
+  } catch (_) {
+    packPickerItems.value = []
+    packPickerTotal.value = 0
+  } finally {
+    packPickerLoading.value = false
+  }
+}
+
+function onPackPickerSearch() {
+  if (_packPickerTimer.value) clearTimeout(_packPickerTimer.value)
+  _packPickerTimer.value = setTimeout(() => {
+    packPickerLoad(1)
+  }, 350)
+}
+
+function packPickerPrev() {
+  if (packPickerPage.value > 1) packPickerLoad(packPickerPage.value - 1)
+}
+
+function packPickerNext() {
+  const totalPages = Math.max(1, Math.ceil(packPickerTotal.value / PACK_PICKER_LIMIT))
+  if (packPickerPage.value < totalPages) packPickerLoad(packPickerPage.value + 1)
+}
+
+function packToggleMember(entry: string, checked: boolean) {
+  if (checked) {
+    if (!packMembers.value.includes(entry)) packMembers.value.push(entry)
+  } else {
+    packMembers.value = packMembers.value.filter(e => e !== entry)
+  }
+}
+
+function packAddManualMember() {
+  const raw = packMemberManualInput.value
+  const parts = raw.split(/[\s,，;；]+/).map(s => s.trim()).filter(Boolean)
+  if (!parts.length) return
+  const added: string[] = []
+  for (const part of parts) {
+    const entry = part.replace(/^@/, '')
+    if (!/^[A-Za-z0-9_-]+$/.test(entry)) {
+      packCreateErr.value = `「${entry}」不是合法的插件 entry（仅字母/数字/_/-）`
+      continue
+    }
+    if (!packMembers.value.includes(entry)) {
+      packMembers.value.push(entry)
+      added.push(entry)
+    }
+  }
+  packMemberManualInput.value = ''
+  if (added.length) packCreateErr.value = ''
+}
+
+function packRemoveMember(entry: string) {
+  packMembers.value = packMembers.value.filter(e => e !== entry)
+}
+
+async function packCreateSubmit() {
+  packCreateErr.value = ''
+  if (!auth.userAuth) {
+    packCreateErr.value = '请先登录'
+    return
+  }
+  const name = packFormName.value.trim()
+  const version = packFormVersion.value.trim()
+  if (!name) {
+    packCreateErr.value = '请输入整合包名称'
+    return
+  }
+  if (name.length > 60) {
+    packCreateErr.value = '名称不能超过 60 字符'
+    return
+  }
+  if (!version) {
+    packCreateErr.value = '请输入版本号'
+    return
+  }
+  if (version.length > 30) {
+    packCreateErr.value = '版本不能超过 30 字符'
+    return
+  }
+  const entries = packMembers.value.filter(Boolean)
+  if (!entries.length) {
+    packCreateErr.value = '请至少选择一个成员插件'
+    return
+  }
+  const entry = packFormEntry.value.trim()
+  if (entry && !/^[A-Za-z0-9_-]+$/.test(entry)) {
+    packCreateErr.value = 'entry 只能包含字母、数字、下划线或中划线（留空则自动生成）'
+    return
+  }
+  packCreateSubmitting.value = true
+  try {
+    const body: Record<string, unknown> = { name, version, entries }
+    if (packFormDesc.value.trim()) body.desc = packFormDesc.value.trim()
+    if (packFormReadme.value.trim()) body.readme = packFormReadme.value
+    if (entry) body.entry = entry
+    const resp = await fetch('/packs/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth.bearerHeaders() } as Record<string, string>,
+      body: JSON.stringify(body),
+    })
+    const text = await resp.text()
+    if (!resp.ok) {
+      if (resp.status === 401) {
+        auth.clearUserAuth()
+        packCreateErr.value = '登录已失效，请重新登录'
+        return
+      }
+      packCreateErr.value = '❌ ' + text
+      return
+    }
+    let createdEntry = ''
+    try {
+      createdEntry = (JSON.parse(text) as any).entry || ''
+    } catch (_) { /* ignore */ }
+    packCloseModal('packCreateModal')
+    packInvalidateMineCache()
+    packShowNotice(`✅ 创建成功！整合包 entry = ${createdEntry || name}`, createdEntry || name)
+    fetchPacks()
+  } catch (e: any) {
+    packCreateErr.value = '❌ 网络错误：' + e.message
+  } finally {
+    packCreateSubmitting.value = false
+  }
+}
+
+// ── Packs: upload pack.lua ──
+function packOpenUploadModal() {
+  if (!auth.userAuth) {
+    toggleUser()
+    return
+  }
+  packUploadErr.value = ''
+  packUploadBody.value = ''
+  packUploadFileName.value = ''
+  showPackUploadModal.value = true
+  nextTick(() => {
+    if (packUploadFileInput.value) packUploadFileInput.value.value = ''
+  })
+}
+
+function onPackUploadFileSelected(input: HTMLInputElement) {
+  const f = input.files?.[0]
+  if (!f) return
+  if (f.size > 2 * 1024 * 1024) {
+    packUploadErr.value = '文件过大，请控制在 2MB 以内'
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => {
+    packUploadBody.value = String(reader.result || '')
+    packUploadFileName.value = f.name
+    packUploadErr.value = ''
+  }
+  reader.readAsText(f)
+}
+
+async function packUploadSubmit() {
+  packUploadErr.value = ''
+  if (!auth.userAuth) {
+    packUploadErr.value = '请先登录'
+    return
+  }
+  const body = packUploadBody.value
+  if (!body.trim()) {
+    packUploadErr.value = '请选择 .lua/.txt 文件，或直接粘贴 pack.lua 内容'
+    return
+  }
+  packUploadSubmitting.value = true
+  try {
+    const resp = await fetch('/packs/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain', ...auth.bearerHeaders() } as Record<string, string>,
+      body,
+    })
+    const text = await resp.text()
+    if (!resp.ok) {
+      if (resp.status === 401) {
+        auth.clearUserAuth()
+        packUploadErr.value = '登录已失效，请重新登录'
+        return
+      }
+      packUploadErr.value = '❌ ' + text
+      return
+    }
+    let entry = ''
+    try {
+      entry = (JSON.parse(text) as any).entry || ''
+    } catch (_) { /* ignore */ }
+    packCloseModal('packUploadModal')
+    packInvalidateMineCache()
+    packShowNotice(`✅ 上传成功！entry = ${entry}`, entry)
+    fetchPacks()
+  } catch (e: any) {
+    packUploadErr.value = '❌ 网络错误：' + e.message
+  } finally {
+    packUploadSubmitting.value = false
+  }
+}
+
+// ── Packs: cover upload (作者对“我的整合包”行内) ──
+function packUploadCover(entry: string) {
+  if (!auth.userAuth) {
+    toggleUser()
+    return
+  }
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = async () => {
+    const f = input.files?.[0]
+    if (!f) return
+    if (f.size > 5 * 1024 * 1024) {
+      alert('封面图不能超过 5MB')
+      return
+    }
+    try {
+      const resp = await fetch(`/packs/${encodeURIComponent(entry)}/cover`, {
+        method: 'POST',
+        headers: auth.bearerHeaders() as Record<string, string>,
+        body: f,
+      })
+      if (resp.ok) {
+        packRefreshCardCover(entry)
+        const p = packItems.value.find(x => x.entry === entry)
+        if (p) p.has_cover = true
+        packShowNotice('✅ 封面已更新')
+      } else if (resp.status === 401) {
+        auth.clearUserAuth()
+        alert('登录已失效，请重新登录')
+      } else {
+        alert('封面上传失败：' + (await resp.text()))
+      }
+    } catch (e: any) {
+      alert('网络错误：' + e.message)
+    }
+  }
+  input.click()
+}
+
+function packRefreshCardCover(entry: string) {
+  const card = document.getElementById('pack-card-' + entry)
+  if (!card) return
+  const cover = card.querySelector('.card-cover') as HTMLElement | null
+  if (!cover) return
+  const url = `/packs/${encodeURIComponent(entry)}/cover?t=${Date.now()}`
+  cover.classList.remove('card-cover-placeholder')
+  cover.innerHTML = `<img src="${url}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span class=cover-icon>📦</span>';this.parentElement.classList.add('card-cover-placeholder')" />`
+}
+
+// ── Packs: window helpers ──
+function packRegisterWindowHelpers() {
+  const w = window as any
+  w.__packSetPage = (p: number) => packSetPage(p)
+  w.__packShowDetail = (entry: string) => packShowDetail(entry)
+  w.__packDelete = (entry: string) => {
+    const p = packItems.value.find(x => x.entry === entry)
+    packDeleteEntry(entry, p ? p.name : entry)
+  }
+  w.__packCover = (entry: string) => packUploadCover(entry)
+  w.__packJumpToPlugin = (entry: string) => packJumpToPlugin(entry)
+}
+
+function packUnregisterWindowHelpers() {
+  const w = window as any
+  delete w.__packSetPage
+  delete w.__packShowDetail
+  delete w.__packDelete
+  delete w.__packCover
+  delete w.__packJumpToPlugin
+}
+
+function onPackKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    packCloseModal('packDetailModal')
+    packCloseModal('packCreateModal')
+    packCloseModal('packUploadModal')
+  }
+}
+
+function onStorePopState() {
+  const v = getInitialStoreView()
+  if (v !== storeView.value) {
+    storeView.value = v
+    if (v === 'packs') fetchPacks()
+  }
+}
+
+onMounted(() => {
+  packRegisterWindowHelpers()
+  document.addEventListener('keydown', onPackKeydown)
+  window.addEventListener('popstate', onStorePopState)
+  if (storeView.value === 'packs') fetchPacks()
+})
+onUnmounted(() => {
+  packUnregisterWindowHelpers()
+  document.removeEventListener('keydown', onPackKeydown)
+  window.removeEventListener('popstate', onStorePopState)
+  if (_packSearchTimer.value) clearTimeout(_packSearchTimer.value)
+  if (_packPickerTimer.value) clearTimeout(_packPickerTimer.value)
+  if (_packNoticeTimer) clearTimeout(_packNoticeTimer)
+})
+
+// 登录态变化会改变卡片上的“我发布的”按钮（删除/传封面）与 mine 过滤可用性，
+// 位于 packs 视图时重新拉取网格（不影响插件视图逻辑）
+watch(
+  () => auth.userAuth,
+  () => {
+    if (storeView.value === 'packs') {
+      packInvalidateMineCache()
+      fetchPacks()
+    }
+  },
+)
 </script>
 
 <template>
   <div class="page-wrap" style="max-width:clamp(900px,94vw,1500px);">
     <!-- ── Top bar ── -->
     <div class="top-bar">
-      <h1>🧩 插件商店</h1>
+      <h1>{{ storeView === 'packs' ? '📦 整合包商店' : '🧩 插件商店' }}</h1>
+      <div class="view-switch" id="storeViewSwitch">
+        <button
+          type="button"
+          class="view-switch-btn"
+          :class="{ active: storeView === 'plugins' }"
+          @click="switchStoreView('plugins')"
+        >
+          🧩 插件
+        </button>
+        <button
+          type="button"
+          class="view-switch-btn"
+          :class="{ active: storeView === 'packs' }"
+          @click="switchStoreView('packs')"
+        >
+          📦 整合包
+        </button>
+      </div>
       <div class="top-bar-actions">
         <button
           v-if="FEATURE_COLLECTIONS_UI"
@@ -1074,8 +1913,56 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- ── Packs view (v-show to keep refs & state; toggled by storeView) ── -->
+    <div class="packs-panel" v-show="storeView === 'packs'">
+      <div class="packs-toolbar">
+        <div class="packs-actions">
+          <button class="btn btn-pack-create" @click="packOpenCreateModal()">🧰 创建整合包</button>
+          <button class="btn btn-pack-upload" @click="packOpenUploadModal()">📤 上传 pack.lua</button>
+          <span class="packs-actions-divider"></span>
+          <button class="chip" :class="{ active: packFilter === 'all' }" @click="packSetFilter('all')">全部</button>
+          <button
+            v-if="auth.userAuth"
+            class="chip"
+            :class="{ active: packFilter === 'mine' }"
+            @click="packSetFilter('mine')"
+          >我发布的</button>
+        </div>
+        <div class="packs-notice" v-if="packNotice">
+          <span>{{ packNotice.text }}</span>
+          <button v-if="packNotice.entry" class="btn-sm btn-detail-sm" @click="packShowDetail(packNotice.entry || '')">📄 查看</button>
+          <button class="btn-sm" title="关闭" @click="packClearNotice()">×</button>
+        </div>
+        <div class="search-sort-row">
+          <input
+            type="search"
+            v-model="packSearch"
+            placeholder="搜索整合包名称、作者或描述…"
+            @input="onPackSearch()"
+            autocomplete="off"
+          />
+          <div class="sort-btns">
+            <button class="btn-sort" :class="{ active: packSort === 'newest' }" @click="packSetSort('newest')">🆕 最新</button>
+            <button class="btn-sort" :class="{ active: packSort === 'downloads' }" @click="packSetSort('downloads')">⬇ 下载</button>
+            <button class="btn-sort" :class="{ active: packSort === 'hot' }" @click="packSetSort('hot')">🔥 热度</button>
+          </div>
+        </div>
+        <p class="pack-install-hint">
+          ⬇ 下载 pack.lua 后，在游戏内「游戏 → 插件管理器 → 商店 → 整合包」安装，
+          可自动补装全部成员插件并支持更新/卸载。
+        </p>
+      </div>
+
+      <!-- pack grid -->
+      <div class="plugin-grid" id="packGrid" ref="packGridRef"></div>
+
+      <!-- pack pagination -->
+      <div class="pagination" id="packPagination" ref="packPaginationRef"></div>
+    </div>
+    <!-- /.packs-panel -->
+
     <!-- ── Upload box ── -->
-    <div class="upload-box">
+    <div class="upload-box" v-show="storeView === 'plugins'">
       <h2>📤 上传插件</h2>
       <div
         id="uploadLoginNotice"
@@ -1161,7 +2048,7 @@ onUnmounted(() => {
     </div>
 
     <!-- ── Filter & Sort ── -->
-    <div class="filter-section">
+    <div class="filter-section" v-show="storeView === 'plugins'">
       <div class="category-chips" id="categoryChips">
         <button
           v-for="c in CATEGORIES"
@@ -1217,10 +2104,10 @@ onUnmounted(() => {
     </div>
 
     <!-- ── Plugin grid ── -->
-    <div class="plugin-grid" id="pluginGrid" ref="pluginGridRef"></div>
+    <div class="plugin-grid" id="pluginGrid" ref="pluginGridRef" v-show="storeView === 'plugins'"></div>
 
     <!-- ── Pagination ── -->
-    <div class="pagination" id="pagination" ref="paginationRef"></div>
+    <div class="pagination" id="pagination" ref="paginationRef" v-show="storeView === 'plugins'"></div>
 
     <!-- ══ MODALS ══ -->
 
@@ -1556,6 +2443,174 @@ onUnmounted(() => {
           <button class="btn btn-danger" @click="confirmDelete()">确认删除</button>
         </div>
         <div class="modal-err" id="deleteErr">{{ deleteErr }}</div>
+      </div>
+    </div>
+
+    <!-- Pack detail modal -->
+    <div
+      class="modal-backdrop"
+      :class="{ show: showPackDetailModal }"
+      id="packDetailModal"
+      @click="packOnBackdropClick($event, 'packDetailModal')"
+    >
+      <div class="modal large">
+        <div class="modal-header">
+          <h3>📦 {{ packDetailTitle }}</h3>
+          <button class="modal-close" @click="packCloseModal('packDetailModal')">×</button>
+        </div>
+        <div v-if="packDetailCoverHtml" class="pack-detail-cover" v-html="packDetailCoverHtml"></div>
+        <div class="readme-plugin-info pack-detail-info" v-html="packDetailInfoHtml"></div>
+        <div class="pack-detail-actions">
+          <a
+            v-if="packDetailFilename"
+            class="btn-sm btn-download-sm"
+            :href="`/packs/download/${encodeURIComponent(packDetailFilename)}`"
+          >⬇ 下载 pack.lua</a>
+          <span class="pack-install-hint-inline">游戏内插件商店安装可自动补装全部成员插件并支持更新/卸载</span>
+          <span style="flex:1"></span>
+          <button
+            v-if="packDetailCanModify && !packDetailLoading"
+            class="btn-sm btn-danger-sm"
+            @click="packDeleteEntry(packDetailEntry, packDetailTitle)"
+          >🗑 删除整合包</button>
+        </div>
+        <div class="modal-body" id="packDetailContent" v-html="packDetailContentHtml"></div>
+      </div>
+    </div>
+
+    <!-- Pack create (form) modal -->
+    <div
+      class="modal-backdrop"
+      :class="{ show: showPackCreateModal }"
+      id="packCreateModal"
+      @click="packOnBackdropClick($event, 'packCreateModal')"
+    >
+      <div class="modal large pack-create-modal">
+        <div class="modal-header">
+          <h3>🧰 创建整合包（表单）</h3>
+          <button class="modal-close" @click="packCloseModal('packCreateModal')">×</button>
+        </div>
+        <div class="modal-scroll">
+          <label>entry（可选，留空由服务端自动生成）</label>
+          <input type="text" v-model="packFormEntry" placeholder="pack_my_kit（字母/数字/_/-）" maxlength="64" />
+          <label>名称 *</label>
+          <input type="text" v-model="packFormName" placeholder="例如：我的塔防整合包" maxlength="60" />
+          <label>版本 *</label>
+          <input type="text" v-model="packFormVersion" placeholder="1.0.0" maxlength="30" />
+          <label>简介</label>
+          <input type="text" v-model="packFormDesc" placeholder="可选，一句话介绍" maxlength="1000" />
+          <label>README（Markdown，可选）</label>
+          <textarea
+            v-model="packFormReadme"
+            rows="5"
+            placeholder="支持 Markdown 语法，将展示在整合包详情页"
+            style="width:100%;background:#111215;border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-family:inherit;resize:vertical;margin-bottom:4px"
+          ></textarea>
+          <label>成员插件（至少 1 个，下方从商店挑选或手动输入）</label>
+          <div class="pack-picker">
+            <div class="pack-picker-search">
+              <input
+                type="search"
+                v-model="packPickerSearch"
+                placeholder="搜索商店插件…"
+                @input="onPackPickerSearch()"
+                autocomplete="off"
+              />
+              <span class="pack-picker-count">共 {{ packPickerTotal }} 个</span>
+            </div>
+            <div class="pack-picker-list" v-if="!packPickerLoading">
+              <label v-for="p in packPickerItems" :key="p.entry" class="pack-picker-item">
+                <input
+                  type="checkbox"
+                  :checked="packMembers.includes(p.entry)"
+                  @change="packToggleMember(p.entry, ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="pack-picker-name">{{ p.name }}</span>
+                <code class="pack-picker-entry">{{ p.entry }}</code>
+              </label>
+              <div v-if="packPickerItems.length === 0" class="pack-picker-empty">没有更多插件</div>
+            </div>
+            <div v-else class="pack-picker-empty">加载中…</div>
+            <div class="pack-picker-pages">
+              <button class="page-btn" :disabled="packPickerPage <= 1" @click="packPickerPrev()">‹</button>
+              <span style="font-size:0.8rem;color:var(--text-dim)">第 {{ packPickerPage }} 页</span>
+              <button
+                class="page-btn"
+                :disabled="packPickerPage * PACK_PICKER_LIMIT >= packPickerTotal"
+                @click="packPickerNext()"
+              >›</button>
+            </div>
+            <div class="pack-picker-manual">
+              <input
+                type="text"
+                v-model="packMemberManualInput"
+                placeholder="或手动输入插件 entry，回车添加"
+                @keydown.enter.prevent="packAddManualMember()"
+                autocomplete="off"
+              />
+              <button class="btn-sm" @click="packAddManualMember()">添加</button>
+            </div>
+            <div class="pack-selected" v-if="packMembers.length">
+              <span class="pack-selected-label">已选：</span>
+              <span v-for="m in packMembers" :key="m" class="pack-selected-tag">
+                {{ m }}
+                <button class="pack-selected-remove" @click="packRemoveMember(m)">×</button>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-btns">
+          <button class="btn" @click="packCloseModal('packCreateModal')">取消</button>
+          <button class="btn btn-primary" :disabled="packCreateSubmitting" @click="packCreateSubmit()">
+            {{ packCreateSubmitting ? '创建中…' : '发布整合包' }}
+          </button>
+        </div>
+        <div class="modal-err">{{ packCreateErr }}</div>
+      </div>
+    </div>
+
+    <!-- Pack upload modal -->
+    <div
+      class="modal-backdrop"
+      :class="{ show: showPackUploadModal }"
+      id="packUploadModal"
+      @click="packOnBackdropClick($event, 'packUploadModal')"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <h3>📤 上传 pack.lua</h3>
+          <button class="modal-close" @click="packCloseModal('packUploadModal')">×</button>
+        </div>
+        <p style="margin:0 0 12px;font-size:0.85rem;color:var(--text-dim)">
+          选择 .lua/.txt 文件（或先粘贴内容再编辑）。pack.lua 需包含
+          <code>entry/name/version/by/members</code>，成员插件必须已在商店上架；内容会在上传前展示以便核对。
+        </p>
+        <div class="drop-zone" style="position:relative;padding:14px;margin-bottom:10px">
+          <input
+            ref="packUploadFileInput"
+            type="file"
+            accept=".lua,.txt"
+            @change="onPackUploadFileSelected($event.target as HTMLInputElement)"
+            @click="($event.target as HTMLInputElement).value = ''"
+          />
+          <div class="drop-zone-icon" style="font-size:1.4rem">📄</div>
+          <div class="drop-zone-label">{{ packUploadFileName || '拖拽 pack.lua 到此，或点击选择' }}</div>
+        </div>
+        <label>pack.lua 内容（可直接编辑）</label>
+        <textarea
+          v-model="packUploadBody"
+          rows="12"
+          spellcheck="false"
+          placeholder="return { entry = '...', name = '...', version = '1.0.0', members = { ... } }"
+          style="width:100%;background:#111215;border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-family:ui-monospace,Consolas,monospace;font-size:0.8rem;resize:vertical"
+        ></textarea>
+        <div class="modal-btns">
+          <button class="btn" @click="packCloseModal('packUploadModal')">取消</button>
+          <button class="btn btn-primary" :disabled="packUploadSubmitting" @click="packUploadSubmit()">
+            {{ packUploadSubmitting ? '上传中…' : '上传发布' }}
+          </button>
+        </div>
+        <div class="modal-err">{{ packUploadErr }}</div>
       </div>
     </div>
 
@@ -2424,6 +3479,334 @@ onUnmounted(() => {
       auto-fill,
       minmax(230px, 1fr)
     );
+  }
+}
+
+/* ── Packs ───────────────────────────────────────── */
+.view-switch {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 3px;
+  flex-shrink: 0;
+}
+.view-switch-btn {
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  padding: 5px 14px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.view-switch-btn:hover {
+  color: var(--text);
+}
+.view-switch-btn.active {
+  background: var(--accent);
+  color: #000;
+  font-weight: 700;
+}
+.packs-panel {
+  margin-bottom: 12px;
+}
+.packs-toolbar {
+  margin: 4px 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.packs-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.packs-actions-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+.btn-pack-create {
+  border-color: #7c4dff;
+  color: #c4b5fd;
+  background: #221a3a;
+}
+.btn-pack-create:hover {
+  background: #2d2450;
+  color: #e9ddff;
+}
+.btn-pack-upload {
+  border-color: #2d8ca8;
+  color: #63c9e8;
+  background: #0e2a35;
+}
+.btn-pack-upload:hover {
+  background: #1a4a5e;
+}
+.packs-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #12301e;
+  border: 1px solid var(--accent2);
+  color: var(--accent2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+.pack-install-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.pack-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pack-card-title-row .card-title {
+  flex: 1;
+  min-width: 0;
+}
+.pack-card-hint {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+.btn-pack-cover-sm {
+  border-color: #a86a2f;
+  color: #ffa94d;
+  background: #2a1a08;
+}
+.btn-pack-cover-sm:hover {
+  background: #3d2a10;
+  color: #ffc078;
+}
+.pack-detail-cover {
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  overflow: hidden;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background: #1a1b20;
+}
+.pack-detail-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pack-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.pack-install-hint-inline {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.pack-desc-fallback {
+  white-space: pre-wrap;
+  color: var(--text);
+}
+.pack-members-block {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.pack-members-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.pack-table-wrap {
+  overflow-x: auto;
+}
+.pack-member-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.pack-member-table th,
+.pack-member-table td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+.pack-member-table th {
+  background: #2a2b31;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.pack-member-table td {
+  background: var(--surface);
+  color: var(--text);
+}
+.pack-member-table tr:nth-child(even) td {
+  background: #1e1f24;
+}
+.pack-member-name {
+  color: #fff;
+  font-weight: 600;
+}
+.pack-member-entry {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-family: ui-monospace, Consolas, monospace;
+}
+.pack-off-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.7rem;
+  color: #ff8787;
+  border: 1px solid #6a2a2a;
+  background: #3a1212;
+  padding: 0 6px;
+  border-radius: 10px;
+  vertical-align: middle;
+}
+.pack-create-modal .modal-scroll {
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.pack-picker {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--bg);
+  margin-bottom: 6px;
+}
+.pack-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pack-picker-search input {
+  flex: 1;
+  margin-bottom: 0;
+}
+.pack-picker-count {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.pack-picker-list {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: #14161b;
+}
+.pack-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(55, 58, 64, 0.4);
+  font-size: 0.85rem;
+}
+.pack-picker-item:last-child {
+  border-bottom: none;
+}
+.pack-picker-item input {
+  margin: 0;
+}
+.pack-picker-name {
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pack-picker-entry {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  background: #1a1b20;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.pack-picker-empty {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 12px;
+}
+.pack-picker-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.pack-picker-manual {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+.pack-picker-manual input {
+  flex: 1;
+  margin-bottom: 0;
+}
+.pack-selected {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.pack-selected-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.pack-selected-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #221a3a;
+  border: 1px solid #7c4dff;
+  color: #c4b5fd;
+  border-radius: 12px;
+  padding: 1px 6px 1px 10px;
+  font-size: 0.78rem;
+  font-family: ui-monospace, Consolas, monospace;
+}
+.pack-selected-remove {
+  border: none;
+  background: none;
+  color: #c4b5fd;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 50%;
+}
+.pack-selected-remove:hover {
+  color: #fff;
+  background: #3a2a6a;
+}
+@media (max-width: 640px) {
+  .pack-detail-actions {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

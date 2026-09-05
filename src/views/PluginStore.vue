@@ -1045,7 +1045,6 @@ let _packMineKey = ''
 const showPackDetailModal = ref(false)
 const packDetailTitle = ref('')
 const packDetailEntry = ref('')
-const packDetailFilename = ref('')
 const packDetailInfoHtml = ref('')
 const packDetailCoverHtml = ref('')
 const packDetailContentHtml = ref('')
@@ -1312,7 +1311,6 @@ function packCardHtml(p: any): string {
   const desc = p.desc ? escHtml(p.desc) : '<span style="color:var(--text-dim)">暂无简介</span>'
   const byUrl = encodeURIComponent(p.by)
   const entryUrl = encodeURIComponent(p.entry)
-  const filename = encodeURIComponent(p.filename || p.entry + '.lua')
   const coverHtml = p.has_cover
     ? `<div class="card-cover"><img src="/packs/${entryUrl}/cover" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span class=cover-icon>📦</span>';this.parentElement.classList.add('card-cover-placeholder')" /></div>`
     : `<div class="card-cover card-cover-placeholder"><span class="cover-icon">📦</span></div>`
@@ -1346,7 +1344,6 @@ function packCardHtml(p: any): string {
       </div>
       <div class="card-actions">
         <button class="btn-sm btn-detail-sm" onclick="window.__packShowDetail('${entry}')">📄 详情</button>
-        <a class="btn-sm btn-download-sm" href="/packs/download/${filename}">⬇ 下载(.zip)</a>
         ${coverBtn}${deleteBtn}
       </div>
       <div class="pack-card-hint">游戏内安装可自动补装成员插件并支持更新/卸载</div>
@@ -1359,7 +1356,6 @@ async function packShowDetail(entry: string) {
   const local = packItems.value.find(p => p.entry === entry)
   packDetailTitle.value = local?.name || entry
   packDetailEntry.value = entry
-  packDetailFilename.value = ''
   packDetailInfoHtml.value = ''
   packDetailCoverHtml.value = ''
   packDetailCanModify.value = false
@@ -1380,7 +1376,6 @@ async function packShowDetail(entry: string) {
     const readme: string = typeof data.readme === 'string' ? data.readme : ''
     const members: any[] = Array.isArray(data.members) ? data.members : []
     packDetailEntry.value = pack.entry || entry
-    packDetailFilename.value = pack.filename || ''
     packDetailTitle.value = pack.name || pack.entry || entry
     packDetailCanModify.value = canModifyPack(pack)
     if (pack.has_cover) {
@@ -1985,8 +1980,7 @@ watch(
           </div>
         </div>
         <p class="pack-install-hint">
-          在游戏内「游戏 → 插件管理器 → 商店 → 整合包」安装可自动补装全部成员插件并支持更新/卸载；
-          网页端下载为 entry.zip（内含 pack.lua 与 README.md）。
+          整合包只能在游戏内安装：游戏 → 插件管理器 → 商店 → 整合包，会自动装齐包内全部插件。
         </p>
       </div>
 
@@ -2497,16 +2491,9 @@ watch(
         </div>
         <div v-if="packDetailCoverHtml" class="pack-detail-cover" v-html="packDetailCoverHtml"></div>
         <div class="readme-plugin-info pack-detail-info" v-html="packDetailInfoHtml"></div>
-        <div class="pack-detail-actions">
-          <a
-            v-if="packDetailFilename"
-            class="btn-sm btn-download-sm"
-            :href="`/packs/download/${encodeURIComponent(packDetailFilename)}`"
-          >⬇ 下载 .zip（pack.lua + README）</a>
-          <span class="pack-install-hint-inline">游戏内插件商店安装可自动补装全部成员插件并支持更新/卸载</span>
+        <div v-if="packDetailCanModify && !packDetailLoading" class="pack-detail-actions">
           <span style="flex:1"></span>
           <button
-            v-if="packDetailCanModify && !packDetailLoading"
             class="btn-sm btn-danger-sm"
             @click="packDeleteEntry(packDetailEntry, packDetailTitle)"
           >🗑 删除整合包</button>
@@ -3669,10 +3656,6 @@ watch(
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 8px;
-}
-.pack-install-hint-inline {
-  font-size: 0.75rem;
-  color: var(--text-dim);
 }
 .pack-desc-fallback {
   white-space: pre-wrap;

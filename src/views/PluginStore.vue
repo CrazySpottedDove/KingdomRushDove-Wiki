@@ -1074,9 +1074,14 @@ const packPickerCat = ref('')
 const packPickerLoading = ref(false)
 const _packPickerTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
-// 操作结果提示（pack 面板内）
+// pack 操作结果提示（pack 面板内）
 const packNotice = ref<{ text: string; entry?: string } | null>(null)
 let _packNoticeTimer: ReturnType<typeof setTimeout> | null = null
+
+// pack 评论弹窗（复用 PluginCommentsModal，kind='pack' 走 /packs 接口）
+const showPackCommentsModal = ref(false)
+const packCommentEntry = ref('')
+const packCommentName = ref('')
 
 function getInitialStoreView(): 'plugins' | 'packs' {
   try {
@@ -1356,6 +1361,7 @@ function packCardHtml(p: any): string {
       </div>
       <div class="card-actions">
         <button class="btn-sm btn-detail-sm" onclick="window.__packShowDetail('${entry}')">📄 详情</button>
+        <button class="btn-sm btn-comment-sm" onclick="window.__packShowComments('${entry}')">💬 评论 <span id="pcc-${entry}" class="pack-cmt-count">${p.comment_count || 0}</span></button>
         ${coverBtn}${deleteBtn}
       </div>
       <div class="pack-card-hint">游戏内安装可自动补装成员插件并支持更新/卸载</div>
@@ -1812,6 +1818,31 @@ function packRefreshCardCover(entry: string) {
   cover.innerHTML = `<img src="${url}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span class=cover-icon>📦</span>';this.parentElement.classList.add('card-cover-placeholder')" />`
 }
 
+// ── Packs: comments ──
+function packAuthorOfEntry(entry: string): string {
+  const p = packItems.value.find(x => x.entry === entry)
+  return p && p.by ? p.by : ''
+}
+
+function packShowComments(entry: string) {
+  const local = packItems.value.find(p => p.entry === entry)
+  packCommentEntry.value = entry
+  packCommentName.value = local?.name || entry
+  showPackCommentsModal.value = true
+}
+
+function onPackCommentCountChange(entry: string, count: number) {
+  const p = packItems.value.find(x => x.entry === entry)
+  if (p) p.comment_count = count
+  const badge = document.getElementById('pcc-' + entry)
+  if (badge) {
+    badge.textContent = String(count || 0)
+  } else {
+    // 卡片不在当前页（例如 mine/分类过滤下已翻页）→ 整格刷新兜底
+    fetchPacks()
+  }
+}
+
 // ── Packs: window helpers ──
 function packRegisterWindowHelpers() {
   const w = window as any
@@ -1823,6 +1854,7 @@ function packRegisterWindowHelpers() {
   }
   w.__packCover = (entry: string) => packUploadCover(entry)
   w.__packJumpToPlugin = (entry: string) => packJumpToPlugin(entry)
+  w.__packShowComments = (entry: string) => packShowComments(entry)
 }
 
 function packUnregisterWindowHelpers() {
@@ -1832,6 +1864,7 @@ function packUnregisterWindowHelpers() {
   delete w.__packDelete
   delete w.__packCover
   delete w.__packJumpToPlugin
+  delete w.__packShowComments
 }
 
 function onPackKeydown(e: KeyboardEvent) {
@@ -2673,13 +2706,25 @@ watch(
       </div>
     </div>
 
-    <!-- Comments modal -->
+    <!-- Comments modal (plugin) -->
     <PluginCommentsModal
       v-model="showCommentsModal"
       :entry="_commentEntry || ''"
       :plugin-name="commentPluginName"
       @close="showCommentsModal = false"
       @count-change="onCommentCountChange"
+      @need-login="toggleUser"
+    />
+
+    <!-- Comments modal (pack) -->
+    <PluginCommentsModal
+      v-model="showPackCommentsModal"
+      kind="pack"
+      :entry="packCommentEntry"
+      :plugin-name="packCommentName"
+      :plugin-author="packAuthorOfEntry(packCommentEntry)"
+      @close="showPackCommentsModal = false"
+      @count-change="onPackCommentCountChange"
       @need-login="toggleUser"
     />
   </div>
@@ -3643,6 +3688,18 @@ watch(
 .btn-pack-edit-sm:hover {
   background: #2d2450;
   color: #e9ddff;
+}
+.pack-cmt-count {
+  display: inline-block;
+  min-width: 16px;
+  text-align: center;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 9px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  background: rgba(136, 200, 144, 0.15);
+  color: #88c890;
 }
 .pack-entry-readonly {
   background: var(--bg);

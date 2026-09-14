@@ -81,6 +81,21 @@ a:hover { text-decoration: underline; }
 .site-nav-links a:hover { color: #fff; background: rgba(255,255,255,0.07); text-decoration: none; }
 .site-nav-links a.active { color: #fff; font-weight: 600; }
 
+/* 语言切换（默认中文，见 src/i18n） */
+.locale-switch {
+    margin-left: auto;
+    padding: 3px 6px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.locale-switch:hover { color: #fff; border-color: var(--accent); }
+.locale-switch:focus { outline: 1px solid var(--accent); }
+
 header {
     padding: 40px 0 24px;
     border-bottom: 1px solid var(--border);

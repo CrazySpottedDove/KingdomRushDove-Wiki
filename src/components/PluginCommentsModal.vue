@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { escHtml, mdToHtml } from '../utils/markdown'
+import { t } from '../i18n'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -48,13 +49,13 @@ function findPluginAuthor(): string {
 
 function renderCommentItemHtml(c: any, isReply: boolean, pluginAuthor: string): string {
   const tagMap: Record<string, [string, string]> = {
-    bug: ['tag-badge tag-bug', '🐛 Bug'],
-    suggestion: ['tag-badge tag-suggestion', '💡 建议'],
+    bug: ['tag-badge tag-bug', t('comments.tag.bug')],
+    suggestion: ['tag-badge tag-suggestion', t('comments.tag.suggestion')],
     general: ['tag-badge tag-general', '💬'],
   }
   const [tagCls, tagLabel] = tagMap[c.tag] || tagMap.general
   const resolvedBadge = c.tag === 'bug' && c.resolved
-    ? '<span class="resolved-badge">✅ 已修复</span>' : ''
+    ? '<span class="resolved-badge">' + t('comments.resolved') + '</span>' : ''
   const canDel = auth.adminToken ||
     (auth.userAuth && (auth.userAuth.username === c.username || auth.userAuth.username === pluginAuthor))
   const canResolve = !isReply && c.tag === 'bug' && auth.userAuth && auth.userAuth.username === pluginAuthor
@@ -62,22 +63,22 @@ function renderCommentItemHtml(c: any, isReply: boolean, pluginAuthor: string): 
     ? `<button class="btn-cmt-sm btn-cmt-danger" onclick="window.${winFn('deleteCmt')}('${escHtml(c.entry)}',${c.id})">🗑</button>` : ''
   const resBtn = canResolve
     ? c.resolved
-      ? `<button class="btn-cmt-sm btn-cmt-resolve" onclick="window.${winFn('toggleResolve')}('${escHtml(c.entry)}',${c.id},false)">↩ 撤销</button>`
-      : `<button class="btn-cmt-sm btn-cmt-resolve" onclick="window.${winFn('toggleResolve')}('${escHtml(c.entry)}',${c.id},true)">✅ 标记已修复</button>`
+      ? `<button class="btn-cmt-sm btn-cmt-resolve" onclick="window.${winFn('toggleResolve')}('${escHtml(c.entry)}',${c.id},false)">${t('comments.unresolve')}</button>`
+      : `<button class="btn-cmt-sm btn-cmt-resolve" onclick="window.${winFn('toggleResolve')}('${escHtml(c.entry)}',${c.id},true)">${t('comments.mark_resolved')}</button>`
     : ''
   const md = mdToHtml(c.content)
   const replyBtn = !isReply
-    ? `<button class="btn-cmt-sm" onclick="window.${winFn('openReply')}('${escHtml(c.entry)}',${c.id})">↩ 回复</button>` : ''
+    ? `<button class="btn-cmt-sm" onclick="window.${winFn('openReply')}('${escHtml(c.entry)}',${c.id})">${t('comments.reply')}</button>` : ''
   const repliesHtml = !isReply
     ? `
     <div class="comment-replies" id="replies-${c.id}">
       ${(c.replies || []).map((r: any) => renderCommentItemHtml(r, true, pluginAuthor)).join('')}
     </div>
     <div class="reply-form" id="reply-form-${c.id}" style="display:none">
-      <textarea rows="2" id="reply-content-${c.id}" placeholder="回复… (支持 Markdown)"></textarea>
+      <textarea rows="2" id="reply-content-${c.id}" placeholder="${t('comments.reply_placeholder')}"></textarea>
       <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end">
-        <button class="btn-cmt-sm" onclick="window.${winFn('closeReply')}(${c.id})">取消</button>
-        <button class="btn btn-primary" style="padding:2px 10px;font-size:0.8rem" onclick="window.${winFn('submitReply')}('${escHtml(c.entry)}',${c.id})">回复</button>
+        <button class="btn-cmt-sm" onclick="window.${winFn('closeReply')}(${c.id})">${t('common.cancel')}</button>
+        <button class="btn btn-primary" style="padding:2px 10px;font-size:0.8rem" onclick="window.${winFn('submitReply')}('${escHtml(c.entry)}',${c.id})">${t('comments.reply')}</button>
       </div>
     </div>`
     : ''
@@ -97,7 +98,7 @@ function renderCommentItemHtml(c: any, isReply: boolean, pluginAuthor: string): 
 function renderPanel() {
   const pluginAuthor = findPluginAuthor()
   if (comments.value.length === 0) {
-    listHtml.value = '<div class="comments-empty">暂无评论，来发表第一条吧！</div>'
+    listHtml.value = '<div class="comments-empty">' + t('comments.no_comments') + '</div>'
   } else {
     listHtml.value = comments.value
       .map((c: any) => renderCommentItemHtml(c, false, pluginAuthor))
@@ -106,17 +107,17 @@ function renderPanel() {
   if (auth.userAuth) {
     formHtml.value = `<div class="comment-form">
       <div class="comment-form-row">
-        <span style="font-size:0.83rem;color:var(--text-dim)">发表评论</span>
+        <span style="font-size:0.83rem;color:var(--text-dim)">${t('comments.post_comment')}</span>
         <select id="commentTag">
-          <option value="general">💬 普通</option>
-          <option value="bug">🐛 Bug 反馈</option>
-          <option value="suggestion">💡 建议</option>
+          <option value="general">${t('comments.tag.general_label')}</option>
+          <option value="bug">${t('comments.tag.bug_label')}</option>
+          <option value="suggestion">${t('comments.tag.suggestion_label')}</option>
         </select>
       </div>
-      <textarea id="commentContent" rows="3" placeholder="支持 Markdown，可粘贴或拖拽图片…"></textarea>
+      <textarea id="commentContent" rows="3" placeholder="${t('comments.content_placeholder')}"></textarea>
       <div class="comment-form-row" style="margin-top:6px;justify-content:flex-end">
         <span id="commentStatus" style="font-size:0.8rem;flex:1"></span>
-        <button class="btn btn-primary" style="padding:4px 14px;font-size:0.83rem" onclick="window.${winFn('postComment')}('${props.entry}')">发布</button>
+        <button class="btn btn-primary" style="padding:4px 14px;font-size:0.83rem" onclick="window.${winFn('postComment')}('${props.entry}')">${t('comments.publish')}</button>
       </div>
     </div>`
     nextTick(() => {
@@ -126,7 +127,7 @@ function renderPanel() {
   } else {
     formHtml.value = `<div class="comment-form">
       <p style="color:var(--text-dim);font-size:0.86rem;text-align:center">
-        <a href="javascript:void(0)" onclick="window.${winFn('commentsNeedLogin')}()" style="color:var(--accent2)">登录</a>后才能发表评论
+        <a href="javascript:void(0)" onclick="window.${winFn('commentsNeedLogin')}()" style="color:var(--accent2)">${t('comments.login_required.before')}</a>${t('comments.login_required.after')}
       </p>
     </div>`
   }
@@ -135,7 +136,7 @@ function renderPanel() {
 async function load() {
   if (!props.modelValue || !props.entry) return
   loading.value = true
-  listHtml.value = '<div style="text-align:center;padding:20px;color:var(--text-dim)">加载中…</div>'
+  listHtml.value = '<div style="text-align:center;padding:20px;color:var(--text-dim)">' + t('common.loading') + '</div>'
   formHtml.value = ''
   try {
     const resp = await fetch(base.value + '/' + encodeURIComponent(props.entry) + '/comments')
@@ -143,10 +144,10 @@ async function load() {
       comments.value = await resp.json()
       renderPanel()
     } else {
-      listHtml.value = '<div style="text-align:center;padding:30px;color:var(--danger)">加载失败</div>'
+      listHtml.value = '<div style="text-align:center;padding:30px;color:var(--danger)">' + t('common.load_failed') + '</div>'
     }
   } catch {
-    listHtml.value = '<div style="text-align:center;padding:30px;color:var(--danger)">网络错误</div>'
+    listHtml.value = '<div style="text-align:center;padding:30px;color:var(--danger)">' + t('common.network_error') + '</div>'
   } finally {
     loading.value = false
   }
@@ -189,10 +190,10 @@ async function postComment(entry: string) {
   const content = ta?.value || ''
   const tag = sel?.value || 'general'
   if (!content.trim()) {
-    if (statusEl) statusEl.textContent = '❌ 内容不能为空'
+    if (statusEl) statusEl.textContent = t('comments.empty_content')
     return
   }
-  if (statusEl) statusEl.textContent = '发布中…'
+  if (statusEl) statusEl.textContent = t('comments.posting')
   try {
     const resp = await fetch(base.value + '/' + encodeURIComponent(entry) + '/comments', {
       method: 'POST',
@@ -205,12 +206,12 @@ async function postComment(entry: string) {
       emit('count-change', entry, comments.value.length)
     } else if (resp.status === 401) {
       auth.clearUserAuth()
-      if (statusEl) statusEl.textContent = '❌ 登录已失效，请重新登录'
+      if (statusEl) statusEl.textContent = t('comments.login_expired')
     } else {
       if (statusEl) statusEl.textContent = '❌ ' + (await resp.text())
     }
   } catch (e: any) {
-    if (statusEl) statusEl.textContent = '❌ 网络错误：' + e.message
+    if (statusEl) statusEl.textContent = t('comments.network_error_detail', { error: e.message })
   }
 }
 
@@ -234,17 +235,17 @@ async function submitReply(entry: string, parentId: number) {
       emit('count-change', entry, comments.value.length)
     } else if (resp.status === 401) {
       auth.clearUserAuth()
-      alert('登录已失效，请重新登录')
+      alert(t('comments.login_expired_plain'))
     } else {
       alert('❌ ' + (await resp.text()))
     }
   } catch (e: any) {
-    alert('❌ 网络错误：' + e.message)
+    alert(t('comments.network_error_detail', { error: e.message }))
   }
 }
 
 async function deleteCmt(entry: string, id: number) {
-  if (!confirm('确认删除这条评论？')) return
+  if (!confirm(t('comments.delete_confirm'))) return
   const headers = auth.adminToken ? auth.adminHeaders() : auth.bearerHeaders()
   try {
     const resp = await fetch(base.value + `/${encodeURIComponent(entry)}/comments/${id}`, {
@@ -257,12 +258,12 @@ async function deleteCmt(entry: string, id: number) {
     } else if (resp.status === 401) {
       if (auth.adminToken) auth.clearAdminToken()
       else auth.clearUserAuth()
-      alert('认证已失效，请重新登录')
+      alert(t('comments.auth_expired'))
     } else {
       alert('❌ ' + (await resp.text()))
     }
   } catch (e: any) {
-    alert('❌ 网络错误：' + e.message)
+    alert(t('comments.network_error_detail', { error: e.message }))
   }
 }
 
@@ -277,7 +278,7 @@ async function toggleResolve(entry: string, id: number, resolved: boolean) {
     if (resp.ok) await load()
     else alert('❌ ' + (await resp.text()))
   } catch (e: any) {
-    alert('❌ 网络错误：' + e.message)
+    alert(t('comments.network_error_detail', { error: e.message }))
   }
 }
 
@@ -286,7 +287,7 @@ function bindImageUpload(ta: HTMLTextAreaElement, getVal: () => string, setVal: 
   ;(ta as any)._imgBound = true
   async function upload(file: File) {
     if (!auth.userAuth || !file.type.startsWith('image/')) return
-    const ph = '![上传中…]()'
+    const ph = t('comments.upload_placeholder')
     setVal(getVal() + ph)
     try {
       // 通用图片上传/访问接口（插件与整合包评论共用，路径不变）
@@ -301,7 +302,7 @@ function bindImageUpload(ta: HTMLTextAreaElement, getVal: () => string, setVal: 
         setVal(getVal().replace(ph, `![${name}](${url})`))
       } else {
         setVal(getVal().replace(ph, ''))
-        alert('❌ 图片上传失败：' + (await resp.text()))
+        alert(t('comments.upload_failed', { error: await resp.text() }))
       }
     } catch (_) {
       setVal(getVal().replace(ph, ''))
@@ -337,7 +338,7 @@ defineExpose({ reload: load })
     <div v-if="modelValue" class="modal-backdrop" :class="{ show: modelValue }" @click.self="close">
       <div class="modal wide" style="max-width:720px">
         <div class="modal-header">
-          <h3>💬 评论 — {{ pluginName || entry }}</h3>
+          <h3>{{ t('comments.title', { name: pluginName || entry }) }}</h3>
           <button class="modal-close" @click="close">×</button>
         </div>
         <div class="comments-scroll" style="max-height:50vh;overflow-y:auto;padding:4px 2px" v-html="listHtml"></div>

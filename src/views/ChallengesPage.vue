@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { mdToHtml } from '../utils/markdown'
+import { t } from '../i18n'
 
 const auth = useAuthStore()
 const PAGE_SIZE = 12
@@ -60,7 +61,7 @@ async function fetchPage() {
     totalChallenges.value = data.total || 0
     currentItems.value = data.items || []
   } catch (e: any) {
-    loadError.value = '加载失败：' + (e.message || '未知错误')
+    loadError.value = t('challenge.load_failed', { error: e.message || t('common.unknown') })
   } finally {
     loading.value = false
   }
@@ -112,7 +113,7 @@ async function confirmUser() {
   const username = (isLogin ? loginUsername.value : regUsername.value).trim()
   const password = isLogin ? loginPassword.value : regPassword.value
   if (!username || !password) {
-    userErr.value = '请填写用户名和密码'
+    userErr.value = t('challenge.need_credentials')
     return
   }
   try {
@@ -131,7 +132,7 @@ async function confirmUser() {
     showUserModal.value = false
     fetchPage()
   } catch (e: any) {
-    userErr.value = '网络错误：' + e.message
+    userErr.value = t('challenge.network_error_detail_plain', { error: e.message })
   }
 }
 
@@ -140,16 +141,16 @@ async function createChallenge() {
   const content_md = challengeContent.value.trim()
   if (!auth.isLoggedIn) {
     publishStatusColor.value = 'var(--danger)'
-    publishStatus.value = '请先登录'
+    publishStatus.value = t('challenge.need_login')
     return
   }
   if (!title || !content_md) {
     publishStatusColor.value = 'var(--danger)'
-    publishStatus.value = '标题和正文都不能为空'
+    publishStatus.value = t('challenge.title_content_required')
     return
   }
   publishStatusColor.value = 'var(--text-dim)'
-  publishStatus.value = '发布中…'
+  publishStatus.value = t('challenge.posting')
   try {
     const resp = await fetch('/challenges', {
       method: 'POST',
@@ -168,18 +169,18 @@ async function createChallenge() {
     challengeTitle.value = ''
     challengeContent.value = ''
     publishStatusColor.value = 'var(--accent2)'
-    publishStatus.value = '✅ 挑战已发布'
+    publishStatus.value = t('challenge.published')
     currentPage.value = 1
     await fetchPage()
     setTimeout(() => { publishStatus.value = '' }, 1500)
   } catch (e: any) {
     publishStatusColor.value = 'var(--danger)'
-    publishStatus.value = '❌ 网络错误：' + e.message
+    publishStatus.value = t('challenge.network_error_detail', { error: e.message })
   }
 }
 
 async function deleteChallenge(id: number) {
-  if (!confirm('确认删除这个挑战？此操作不可撤销。')) return
+  if (!confirm(t('challenge.delete_confirm'))) return
   try {
     const resp = await fetch(`/challenges/${id}`, {
       method: 'DELETE',
@@ -192,7 +193,7 @@ async function deleteChallenge(id: number) {
     }
     await fetchPage()
   } catch (e: any) {
-    alert('❌ 网络错误：' + e.message)
+    alert(t('challenge.network_error_detail', { error: e.message }))
   }
 }
 
@@ -218,7 +219,7 @@ async function toggleLike(id: number) {
     const item = currentItems.value.find((x: any) => x.id === id)
     if (item) item.like_count = data.like_count
   } catch (e: any) {
-    alert('❌ 网络错误：' + e.message)
+    alert(t('challenge.network_error_detail', { error: e.message }))
   }
 }
 
@@ -248,11 +249,11 @@ async function loadComments(id: number) {
 async function postComment() {
   const content = commentContent.value.trim()
   if (!content) {
-    commentStatus.value = '❌ 内容不能为空'
+    commentStatus.value = t('challenge.empty_comment')
     commentStatusColor.value = 'var(--danger)'
     return
   }
-  commentStatus.value = '发布中…'
+  commentStatus.value = t('challenge.posting')
   commentStatusColor.value = 'var(--text-dim)'
   try {
     const resp = await fetch(`/challenges/${commentChallengeId.value}/comments`, {
@@ -275,7 +276,7 @@ async function postComment() {
     const item = currentItems.value.find((x: any) => x.id === commentChallengeId.value)
     if (item) item.comment_count = (item.comment_count || 0) + 1
   } catch (e: any) {
-    commentStatus.value = '❌ 网络错误：' + e.message
+    commentStatus.value = t('challenge.network_error_detail', { error: e.message })
     commentStatusColor.value = 'var(--danger)'
   }
 }
@@ -289,65 +290,65 @@ onMounted(async () => {
 <template>
   <div class="page-wrap" style="max-width:1100px;margin:0 auto;padding:0 16px 60px;">
     <div class="top-bar">
-      <h1>🏁 挑战栏目</h1>
+      <h1>{{ t('challenge.title') }}</h1>
       <div class="top-bar-actions">
         <button class="btn" :class="{ active: auth.isLoggedIn }" @click="toggleUser">
-          {{ auth.isLoggedIn ? '👤 ' + auth.userAuth!.username + ' (退出)' : '👤 用户登录' }}
+          {{ auth.isLoggedIn ? t('challenge.hero.logged_in', { name: auth.userAuth!.username }) : t('challenge.hero.login') }}
         </button>
       </div>
     </div>
 
     <div class="notice-box">
-      <h2>挑战须知（请认真阅读）</h2>
+      <h2>{{ t('challenge.notice.title') }}</h2>
       <ul>
-        <li>挑战正文必须写清楚：所有配置项、限制条件、胜利判定标准。</li>
-        <li>挑战提出者必须自己先通过，并提供视频证据（建议附上链接）。</li>
-        <li>挑战正文与"揭榜"评论均支持 Markdown。</li>
-        <li>评论区用于"揭榜"反馈、过程讨论与成绩展示，请保持礼貌。</li>
+        <li>{{ t('challenge.notice.1') }}</li>
+        <li>{{ t('challenge.notice.2') }}</li>
+        <li>{{ t('challenge.notice.3') }}</li>
+        <li>{{ t('challenge.notice.4') }}</li>
       </ul>
     </div>
 
     <div class="publish-box">
-      <h2>发布挑战</h2>
+      <h2>{{ t('challenge.post.title') }}</h2>
       <div class="publish-hint" v-if="!auth.isLoggedIn">
-        ⚠️ 请先登录账户后发布挑战。
+        {{ t('challenge.login_hint') }}
       </div>
-      <label>挑战标题</label>
-      <input type="text" v-model="challengeTitle" placeholder="例如：无英雄无道具通关海盗港" maxlength="120" />
+      <label>{{ t('challenge.field.title') }}</label>
+      <input type="text" v-model="challengeTitle" :placeholder="t('challenge.title_placeholder')" maxlength="120" />
       <div style="height: 8px"></div>
-      <label>挑战正文（Markdown）</label>
-      <textarea v-model="challengeContent" placeholder="请详细写明规则、配置、限制、通过条件、视频证据链接等"></textarea>
+      <label>{{ t('challenge.field.content') }}</label>
+      <textarea v-model="challengeContent" :placeholder="t('challenge.content_placeholder')"></textarea>
       <div class="publish-hint">
-        示例：地图、难度、允许/禁用塔、允许/禁用英雄、是否允许暂停、视频链接。
+        {{ t('challenge.example') }}
       </div>
       <div class="publish-actions">
         <span class="publish-hint" :style="{ color: publishStatusColor }">{{ publishStatus }}</span>
-        <button class="btn btn-primary" @click="createChallenge">发布挑战</button>
+        <button class="btn btn-primary" @click="createChallenge">{{ t('challenge.publish') }}</button>
       </div>
     </div>
 
     <div class="tools-row">
-      <button class="btn" :class="{ active: currentSort === 'default' }" @click="setSort('default')">默认</button>
-      <button class="btn" :class="{ active: currentSort === 'hot' }" @click="setSort('hot')">热度</button>
-      <button class="btn" :class="{ active: currentSort === 'newest' }" @click="setSort('newest')">最新</button>
-      <input type="search" id="searchBox" placeholder="搜索标题、正文或作者" v-model="currentSearch" @input="onSearch" />
+      <button class="btn" :class="{ active: currentSort === 'default' }" @click="setSort('default')">{{ t('challenge.sort.default') }}</button>
+      <button class="btn" :class="{ active: currentSort === 'hot' }" @click="setSort('hot')">{{ t('challenge.sort.hot') }}</button>
+      <button class="btn" :class="{ active: currentSort === 'newest' }" @click="setSort('newest')">{{ t('challenge.sort.newest') }}</button>
+      <input type="search" id="searchBox" :placeholder="t('challenge.search_placeholder')" v-model="currentSearch" @input="onSearch" />
     </div>
 
     <div class="challenge-grid">
       <template v-if="loading">
-        <div style="grid-column:1/-1;text-align:center;color:var(--text-dim);padding:32px 0;">加载中…</div>
+        <div style="grid-column:1/-1;text-align:center;color:var(--text-dim);padding:32px 0;">{{ t('common.loading') }}</div>
       </template>
       <template v-else-if="loadError">
         <div style="grid-column:1/-1;text-align:center;color:var(--danger);padding:32px 0;">{{ loadError }}</div>
       </template>
       <template v-else-if="currentItems.length === 0">
-        <div style="grid-column:1/-1;text-align:center;color:var(--text-dim);padding:36px 0;">📭 暂无挑战</div>
+        <div style="grid-column:1/-1;text-align:center;color:var(--text-dim);padding:36px 0;">{{ t('challenge.empty') }}</div>
       </template>
       <template v-else>
         <div v-for="c in currentItems" :key="c.id" class="challenge-card">
           <div class="card-head">
             <div class="card-title">{{ c.title }}</div>
-            <div class="card-meta">作者：{{ c.author }} · 发布：{{ fmtDate(c.created_at) }}</div>
+            <div class="card-meta">{{ t('challenge.card.meta', { author: c.author, date: fmtDate(c.created_at) }) }}</div>
           </div>
           <div class="card-body" v-html="mdToHtml(c.content_md)"></div>
           <div class="card-footer">
@@ -356,9 +357,9 @@ onMounted(async () => {
               <span>💬 {{ c.comment_count || 0 }}</span>
             </div>
             <div class="card-actions">
-              <button class="btn btn-sm btn-like" :class="{ liked: auth.myLikes.has(c.id) }" @click="toggleLike(c.id)">{{ auth.myLikes.has(c.id) ? '💖 已赞' : '🤍 点赞' }}</button>
-              <button class="btn btn-sm" @click="openComments(c.id, c.title)">💬 揭榜</button>
-              <button v-if="auth.userAuth?.username === c.author" class="btn btn-sm btn-danger" @click="deleteChallenge(c.id)">🗑 删除</button>
+              <button class="btn btn-sm btn-like" :class="{ liked: auth.myLikes.has(c.id) }" @click="toggleLike(c.id)">{{ auth.myLikes.has(c.id) ? t('challenge.like.liked') : t('challenge.like.like') }}</button>
+              <button class="btn btn-sm" @click="openComments(c.id, c.title)">{{ t('challenge.btn.comments') }}</button>
+              <button v-if="auth.userAuth?.username === c.author" class="btn btn-sm btn-danger" @click="deleteChallenge(c.id)">{{ t('challenge.btn.delete') }}</button>
             </div>
           </div>
         </div>
@@ -366,21 +367,21 @@ onMounted(async () => {
     </div>
 
     <div class="pagination" v-if="totalPages > 1">
-      <button class="btn" :disabled="currentPage <= 1" @click="setPage(currentPage - 1)">‹ 上一页</button>
-      <span style="font-size:0.83rem;color:var(--text-dim)">第 {{ currentPage }} / {{ totalPages }} 页 · 共 {{ totalChallenges }} 条</span>
-      <button class="btn" :disabled="currentPage >= totalPages" @click="setPage(currentPage + 1)">下一页 ›</button>
+      <button class="btn" :disabled="currentPage <= 1" @click="setPage(currentPage - 1)">‹ {{ t('common.prev') }}</button>
+      <span style="font-size:0.83rem;color:var(--text-dim)">{{ t('challenge.page_info', { page: currentPage, total: totalPages, count: totalChallenges }) }}</span>
+      <button class="btn" :disabled="currentPage >= totalPages" @click="setPage(currentPage + 1)">{{ t('common.next') }} ›</button>
     </div>
   </div>
 
   <div class="modal-backdrop" :class="{ show: showCommentsModal }" @click.self="showCommentsModal = false">
     <div class="modal">
       <div class="modal-header">
-        <h3 id="commentsTitle">💬 揭榜评论 — {{ commentChallengeTitle }}</h3>
+        <h3 id="commentsTitle">{{ t('challenge.comments.title', { title: commentChallengeTitle }) }}</h3>
         <button class="modal-close" @click="showCommentsModal = false">×</button>
       </div>
       <div class="comments-scroll" id="commentsList">
-        <div v-if="loadingComments" style="text-align:center;color:var(--text-dim);padding:16px 0;">加载中…</div>
-        <div v-else-if="comments.length === 0" style="text-align:center;color:var(--text-dim);padding:16px 0;">暂无揭榜评论，来发表第一条吧！</div>
+        <div v-if="loadingComments" style="text-align:center;color:var(--text-dim);padding:16px 0;">{{ t('common.loading') }}</div>
+        <div v-else-if="comments.length === 0" style="text-align:center;color:var(--text-dim);padding:16px 0;">{{ t('challenge.comments.empty') }}</div>
         <template v-else>
           <div v-for="c in comments" :key="c.id || c.created_at" class="comment">
             <div class="comment-head">
@@ -394,14 +395,14 @@ onMounted(async () => {
       <div class="comment-form">
         <template v-if="!auth.isLoggedIn">
           <p style="text-align:center;color:var(--text-dim);font-size:0.84rem;margin:4px 0;">
-            <a href="javascript:void(0)" @click="showCommentsModal = false; toggleUser()" style="color:var(--accent2);">登录</a>后才能揭榜评论
+            <a href="javascript:void(0)" @click="showCommentsModal = false; toggleUser()" style="color:var(--accent2);">{{ t('challenge.comment_login.before') }}</a>{{ t('challenge.comment_login.after') }}
           </p>
         </template>
         <template v-else>
-          <textarea v-model="commentContent" placeholder="写下你的揭榜过程、结论或视频链接（支持 Markdown）"></textarea>
+          <textarea v-model="commentContent" :placeholder="t('challenge.comment_placeholder')"></textarea>
           <div class="comment-form-actions">
             <span style="font-size:0.8rem;flex:1;" :style="{ color: commentStatusColor || 'var(--text-dim)' }">{{ commentStatus }}</span>
-            <button class="btn btn-primary" @click="postComment">发布评论</button>
+            <button class="btn btn-primary" @click="postComment">{{ t('challenge.comment.publish') }}</button>
           </div>
         </template>
       </div>
@@ -411,30 +412,30 @@ onMounted(async () => {
   <div class="modal-backdrop" :class="{ show: showUserModal }" @click.self="showUserModal = false">
     <div class="modal" style="width: min(420px, 96vw)">
       <div class="modal-header">
-        <h3>👤 用户账户</h3>
+        <h3>{{ t('challenge.user.title') }}</h3>
         <button class="modal-close" @click="showUserModal = false">×</button>
       </div>
       <div class="modal-tabs">
-        <button class="modal-tab" :class="{ active: userTab === 'login' }" @click="switchUserTab('login')">登录</button>
-        <button class="modal-tab" :class="{ active: userTab === 'register' }" @click="switchUserTab('register')">注册</button>
+        <button class="modal-tab" :class="{ active: userTab === 'login' }" @click="switchUserTab('login')">{{ t('challenge.user.tab.login') }}</button>
+        <button class="modal-tab" :class="{ active: userTab === 'register' }" @click="switchUserTab('register')">{{ t('challenge.user.tab.register') }}</button>
       </div>
       <div id="loginForm" v-show="userTab === 'login'">
-        <label>用户名</label>
+        <label>{{ t('challenge.user.username') }}</label>
         <input type="text" v-model="loginUsername" autocomplete="username" />
         <div style="height: 6px"></div>
-        <label>密码</label>
+        <label>{{ t('challenge.user.password') }}</label>
         <input type="password" v-model="loginPassword" autocomplete="current-password" />
       </div>
       <div id="registerForm" v-show="userTab === 'register'">
-        <label>用户名</label>
+        <label>{{ t('challenge.user.username') }}</label>
         <input type="text" v-model="regUsername" autocomplete="username" />
         <div style="height: 6px"></div>
-        <label>密码</label>
+        <label>{{ t('challenge.user.password') }}</label>
         <input type="password" v-model="regPassword" autocomplete="new-password" />
       </div>
       <div class="modal-btns">
-        <button class="btn" @click="showUserModal = false">取消</button>
-        <button class="btn btn-primary" @click="confirmUser">{{ userTab === 'login' ? '登录' : '注册' }}</button>
+        <button class="btn" @click="showUserModal = false">{{ t('common.cancel') }}</button>
+        <button class="btn btn-primary" @click="confirmUser">{{ userTab === 'login' ? t('challenge.user.tab.login') : t('challenge.user.tab.register') }}</button>
       </div>
       <div class="modal-err" v-if="userErr">{{ userErr }}</div>
     </div>

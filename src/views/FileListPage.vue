@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { escHtml } from '../utils/markdown'
+import { t, type MessageKey } from '../i18n'
 
 interface FileEntry {
   name: string
@@ -26,10 +27,10 @@ const route = useRoute()
 const router = useRouter()
 const listing = ref<DirListing | null>(null)
 const loading = ref(true)
-const error = ref('')
+const error = ref<MessageKey | ''>('')
 
 const apiBase = '/api/assets/list'
-const sectionTitle = '🎨 美术资源'
+const sectionTitle = computed(() => '🎨 ' + t('nav.assets'))
 
 async function fetchList(subdir = '') {
   loading.value = true
@@ -37,9 +38,9 @@ async function fetchList(subdir = '') {
   try {
     const params = subdir ? `?path=${encodeURIComponent(subdir)}` : ''
     const resp = await fetch(`${apiBase}${params}`)
-    if (!resp.ok) { error.value = '加载失败'; return }
+    if (!resp.ok) { error.value = 'common.load_failed'; return }
     listing.value = await resp.json()
-  } catch { error.value = '网络错误' }
+  } catch { error.value = 'common.network_error' }
   loading.value = false
 }
 
@@ -85,11 +86,11 @@ onMounted(() => {
 
     <div v-if="listing?.tip" class="notice" v-html="listing.tip"></div>
 
-    <div v-if="loading" style="text-align:center;padding:40px;color:var(--text-dim)">加载中…</div>
-    <div v-else-if="error" style="text-align:center;padding:40px;color:var(--danger)">{{ error }}</div>
+    <div v-if="loading" style="text-align:center;padding:40px;color:var(--text-dim)">{{ t('common.loading') }}</div>
+    <div v-else-if="error" style="text-align:center;padding:40px;color:var(--danger)">{{ t(error) }}</div>
     <table v-else-if="listing">
       <thead>
-        <tr><th></th><th>名称</th><th>大小</th><th>修改时间</th></tr>
+        <tr><th></th><th>{{ t('file.name') }}</th><th>{{ t('file.size') }}</th><th>{{ t('file.mtime') }}</th></tr>
       </thead>
       <tbody>
         <tr v-if="!listing.is_root" @click="goParent" style="cursor:pointer">
@@ -113,7 +114,7 @@ onMounted(() => {
           <td>{{ e.modified }}</td>
         </tr>
         <tr v-if="listing.entries.length === 0">
-          <td colspan="4" style="text-align:center;color:var(--text-dim);padding:24px">（此目录为空）</td>
+          <td colspan="4" style="text-align:center;color:var(--text-dim);padding:24px">{{ t('file.empty_dir') }}</td>
         </tr>
       </tbody>
     </table>

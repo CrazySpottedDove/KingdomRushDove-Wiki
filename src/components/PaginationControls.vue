@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { t } from '../i18n'
 
 const props = defineProps<{
   modelValue: number
@@ -46,7 +47,7 @@ function go(p: number) {
       :disabled="modelValue <= 1"
       @click="go(modelValue - 1)"
     >
-      ‹ 上一页
+      ‹ {{ t('common.prev') }}
     </button>
     <template v-for="p in pageButtons" :key="p">
       <span v-if="p === '...'" class="page-ellipsis">…</span>
@@ -63,7 +64,7 @@ function go(p: number) {
       :disabled="modelValue >= totalPages"
       @click="go(modelValue + 1)"
     >
-      下一页 ›
+      {{ t('common.next') }} ›
     </button>
   </div>
 </template>

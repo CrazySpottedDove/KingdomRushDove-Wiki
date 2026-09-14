@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import { t } from '../i18n'
 
 export interface WikiEntry {
   name: string
@@ -44,7 +45,7 @@ function isActive(path: string) {
           class="sidebar-child sidebar-child-index"
           :class="{ active: route.path === entry.path }"
         >
-          📖 概览
+          📖 {{ t('wiki.overview') }}
         </router-link>
         <SidebarNode
           v-for="c in entry.children"

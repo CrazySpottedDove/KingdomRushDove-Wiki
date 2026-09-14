@@ -3,20 +3,22 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { escHtml, mdToHtml } from '../utils/markdown'
 import PluginCommentsModal from '../components/PluginCommentsModal.vue'
+import { t } from '../i18n'
 
 const auth = useAuthStore()
 
 const FEATURE_COLLECTIONS_UI = false
+// name 用 getter，模板/拼接 HTML 读取时都按当前语言取文案
 const CATEGORIES = [
-  { slug: '', icon: '🔍', name: '全部' },
-  { slug: 'gameplay', icon: '🎮', name: '玩法' },
-  { slug: 'cosmetic', icon: '🎨', name: '美化' },
-  { slug: 'display', icon: '🖥️', name: '显示' },
-  { slug: 'tower', icon: '🏰', name: '防御塔' },
-  { slug: 'hero', icon: '🦸', name: '英雄' },
-  { slug: 'enemy', icon: '👾', name: '敌人' },
-  { slug: 'level', icon: '🗺️', name: '关卡' },
-  { slug: 'other', icon: '📦', name: '其他' },
+  { slug: '', icon: '🔍', get name() { return t('category.all') } },
+  { slug: 'gameplay', icon: '🎮', get name() { return t('category.gameplay') } },
+  { slug: 'cosmetic', icon: '🎨', get name() { return t('category.cosmetic') } },
+  { slug: 'display', icon: '🖥️', get name() { return t('category.display') } },
+  { slug: 'tower', icon: '🏰', get name() { return t('category.tower') } },
+  { slug: 'hero', icon: '🦸', get name() { return t('category.hero') } },
+  { slug: 'enemy', icon: '👾', get name() { return t('category.enemy') } },
+  { slug: 'level', icon: '🗺️', get name() { return t('category.level') } },
+  { slug: 'other', icon: '📦', get name() { return t('category.other') } },
 ]
 const PAGE_SIZE = 15
 
@@ -98,14 +100,14 @@ const totalPages = computed(() => Math.max(1, Math.ceil(totalPlugins.value / PAG
 const isLoggedIn = computed(() => auth.userAuth !== null)
 
 const userBtnLabel = computed(() => {
-  if (auth.userAuth) return `👤 ${escHtml(auth.userAuth.username)} (退出)`
-  return '👤 用户登录'
+  if (auth.userAuth) return t('dev.login.logged_in', { name: auth.userAuth.username })
+  return t('store.user.login')
 })
 const userBtnActive = computed(() => !!auth.userAuth)
 
 const adminBtnLabel = computed(() => {
-  if (auth.adminToken) return '🔓 退出管理员'
-  return '🔑 管理员'
+  if (auth.adminToken) return t('store.admin.exit')
+  return t('store.admin.enter')
 })
 const adminBtnActive = computed(() => !!auth.adminToken)
 
@@ -195,7 +197,7 @@ function onSearch() {
 async function fetchPage() {
   if (!pluginGridRef.value) return
   pluginGridRef.value.innerHTML =
-    '<div class="grid-loading" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">加载中…</div>'
+    '<div class="grid-loading" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">' + t('common.loading') + '</div>'
   const params = new URLSearchParams({
     sort: currentSort.value,
     page: String(currentPage.value),
@@ -213,7 +215,7 @@ async function fetchPage() {
       const pages = totalPages.value
       if (items.length === 0) {
         pluginGridRef.value.innerHTML =
-          '<div class="grid-empty" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">📭 暂无插件</div>'
+          '<div class="grid-empty" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">' + t('store.empty.plugins') + '</div>'
       } else {
         pluginGridRef.value.innerHTML = items.map(p => renderCardHtml(p)).join('')
       }
@@ -222,7 +224,7 @@ async function fetchPage() {
     }
   } catch (_) {}
   pluginGridRef.value.innerHTML =
-    '<div class="grid-empty" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">加载失败，请刷新重试</div>'
+    '<div class="grid-empty" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">' + t('store.load_failed_retry') + '</div>'
   renderPagination(0, 1)
 }
 
@@ -246,7 +248,7 @@ function renderPagination(total: number, pages: number) {
     prev = p
   }
   html += `<button class="page-btn" onclick="window.__setPage(${currentPage.value + 1})" ${currentPage.value === pages ? 'disabled' : ''}>›</button>`
-  html += `<span style="font-size:0.8rem;color:var(--text-dim);margin-left:6px">共 ${total} 个</span>`
+  html += `<span style="font-size:0.8rem;color:var(--text-dim);margin-left:6px">${t('store.count_suffix', { total })}</span>`
   el.innerHTML = html
 }
 ;(window as any).__setPage = (p: number) => {
@@ -274,13 +276,13 @@ function renderCardHtml(p: any): string {
   const filename = encodeURIComponent(p.filename)
   const catSlug = escHtml(p.category)
   const likeBtn = liked ? '❤' : '🤍'
-  const likeTitle = liked ? '取消点赞' : '点赞'
+  const likeTitle = liked ? t('dev.unlike') : t('dev.like')
   const likeCls = liked ? ' liked' : ''
   const favBtn = favorited ? '⭐' : '☆'
-  const favTitle = favorited ? '取消收藏' : '收藏插件'
+  const favTitle = favorited ? t('dev.unfavorite') : t('dev.favorite')
   const favCls = favorited ? ' favorited' : ''
   const deleteBtn = canModify(p)
-    ? `<button class="btn-sm btn-danger-sm" onclick="window.__openDelete('${entry}')">🗑 删除</button>`
+    ? `<button class="btn-sm btn-danger-sm" onclick="window.__openDelete('${entry}')">${t('challenge.btn.delete')}</button>`
     : ''
   return `<div class="plugin-card" id="card-${entry}">
     ${coverHtml}
@@ -303,24 +305,24 @@ function renderCardHtml(p: any): string {
       </div>
       <div class="card-title" title="${pname}">${pname}</div>
       <div class="card-author">
-        <a href="/developer/${encodeURIComponent(p.by)}" class="author-avatar-link" title="进入 ${pby} 的主页">
+        <a href="/developer/${encodeURIComponent(p.by)}" class="author-avatar-link" title="${t('store.author.home', { name: pby })}">
           <img src="/api/users/${encodeURIComponent(p.by)}/avatar" alt="${pby}" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='👤';" />
         </a>
-        <a href="/developer/${encodeURIComponent(p.by)}" class="author-link" title="查看${pby}的主页">${pby}</a>
+        <a href="/developer/${encodeURIComponent(p.by)}" class="author-link" title="${t('store.author.view', { name: pby })}">${pby}</a>
         <span class="card-version">v${version}</span>
       </div>
       <div class="card-desc">${desc}</div>
     </div>
     <div class="card-footer">
       <div class="card-stats">
-        <span title="下载量">⬇ ${p.downloads}</span>
-        <span title="评论数">💬 ${p.comment_count || 0}</span>
-        <span title="发布日期">📅 ${fmtDate(p.published_at)}</span>
+        <span title="${t('dev.field.downloads')}">⬇ ${p.downloads}</span>
+        <span title="${t('store.comment_count')}">💬 ${p.comment_count || 0}</span>
+        <span title="${t('dev.field.published')}">📅 ${fmtDate(p.published_at)}</span>
       </div>
       <div class="card-actions">
-        <button class="btn-sm btn-detail-sm"  onclick="window.__showDetail('${entry}')">📄 详情</button>
-        <button class="btn-sm btn-comment-sm" onclick="window.__showComments('${entry}')">💬 评论</button>
-        <a class="btn-sm btn-download-sm"     href="/plugins/download/${filename}">⬇ 下载</a>
+        <button class="btn-sm btn-detail-sm"  onclick="window.__showDetail('${entry}')">📄 ${t('dev.detail')}</button>
+        <button class="btn-sm btn-comment-sm" onclick="window.__showComments('${entry}')">💬 ${t('common.comments')}</button>
+        <a class="btn-sm btn-download-sm"     href="/plugins/download/${filename}">⬇ ${t('common.download')}</a>
         ${deleteBtn}
       </div>
     </div>
@@ -374,7 +376,7 @@ async function confirmUser() {
     const username = loginUsername.value.trim()
     const password = loginPassword.value
     if (!username || !password) {
-      userErr.value = '请填写用户名和密码'
+      userErr.value = t('common.need_credentials')
       return
     }
     try {
@@ -393,13 +395,13 @@ async function confirmUser() {
         userErr.value = '❌ ' + (await resp.text())
       }
     } catch (e: any) {
-      userErr.value = '❌ 网络错误：' + e.message
+      userErr.value = t('common.network_error_detail', { error: e.message })
     }
   } else {
     const username = regUsername.value.trim()
     const password = regPassword.value
     if (!username || !password) {
-      userErr.value = '请填写用户名和密码'
+      userErr.value = t('common.need_credentials')
       return
     }
     try {
@@ -417,7 +419,7 @@ async function confirmUser() {
         userErr.value = '❌ ' + (await resp.text())
       }
     } catch (e: any) {
-      userErr.value = '❌ 网络错误：' + e.message
+      userErr.value = t('common.network_error_detail', { error: e.message })
     }
   }
 }
@@ -438,7 +440,7 @@ function toggleAdmin() {
 async function confirmAdmin() {
   const token = adminTokenInput.value.trim()
   if (!token) {
-    adminErr.value = '请输入 Token'
+    adminErr.value = t('store.admin.token_required')
     return
   }
   adminSubmitting.value = true
@@ -448,14 +450,14 @@ async function confirmAdmin() {
       headers: { 'X-Admin-Token': token },
     })
     if (!resp.ok) {
-      adminErr.value = resp.status === 401 ? '管理员 Token 不正确' : '验证失败，请稍后重试'
+      adminErr.value = resp.status === 401 ? t('store.admin.bad_token') : t('store.admin.verify_failed')
       return
     }
     auth.setAdminToken(token)
     showAdminModal.value = false
     fetchPage()
   } catch {
-    adminErr.value = '网络错误，请稍后重试'
+    adminErr.value = t('store.network_error_retry')
   } finally {
     adminSubmitting.value = false
   }
@@ -490,17 +492,17 @@ async function uploadPlugin() {
   uploadStatusColor.value = ''
   if (!auth.userAuth) {
     uploadStatusColor.value = 'var(--danger)'
-    uploadStatusText.value = '请先登录账户'
+    uploadStatusText.value = t('store.need_login')
     return
   }
   const zipFile = _zipFile.value
   if (!zipFile) {
     uploadStatusColor.value = 'var(--danger)'
-    uploadStatusText.value = '请先选择 .zip 文件'
+    uploadStatusText.value = t('store.select_zip')
     return
   }
   uploadStatusColor.value = 'var(--text-dim)'
-  uploadStatusText.value = '上传中…'
+  uploadStatusText.value = t('store.uploading')
   try {
     const resp = await fetch('/plugins/upload', {
       method: 'POST',
@@ -512,7 +514,7 @@ async function uploadPlugin() {
       if (resp.status === 401) {
         auth.clearUserAuth()
         uploadStatusColor.value = 'var(--danger)'
-        uploadStatusText.value = '❌ 登录已失效'
+        uploadStatusText.value = t('store.login_expired')
         return
       }
       uploadStatusColor.value = 'var(--danger)'
@@ -523,7 +525,7 @@ async function uploadPlugin() {
     const entry = result.entry
     const coverFile = _coverFile.value
     if (coverFile && entry) {
-      uploadStatusText.value = '上传封面图…'
+      uploadStatusText.value = t('store.uploading_cover')
       await fetch(`/plugins/${encodeURIComponent(entry)}/cover`, {
         method: 'POST',
         headers: auth.bearerHeaders() as Record<string, string>,
@@ -531,7 +533,7 @@ async function uploadPlugin() {
       })
     }
     uploadStatusColor.value = 'var(--accent2)'
-    uploadStatusText.value = '✅ 上传成功！'
+    uploadStatusText.value = t('store.upload_ok')
     setTimeout(() => {
       _zipFile.value = null
       _coverFile.value = null
@@ -544,7 +546,7 @@ async function uploadPlugin() {
     }, 1500)
   } catch (e: any) {
     uploadStatusColor.value = 'var(--danger)'
-    uploadStatusText.value = '❌ 网络错误：' + e.message
+    uploadStatusText.value = t('common.network_error_detail', { error: e.message })
   }
 }
 
@@ -572,7 +574,7 @@ async function toggleLike(event: Event, entry: string) {
       const likeBtn = cardEl?.querySelector('.btn-like[data-kind="like"]') as HTMLElement
       if (likeBtn) {
         likeBtn.classList.toggle('liked', !liked)
-        likeBtn.title = liked ? '点赞' : '取消点赞'
+        likeBtn.title = liked ? t('dev.like') : t('dev.unlike')
         likeBtn.innerHTML = `${!liked ? '❤' : '🤍'}<span id="likes-${entry}">${data.like_count}</span>`
       }
     } else if (resp.status === 401) {
@@ -580,10 +582,10 @@ async function toggleLike(event: Event, entry: string) {
       toggleUser()
     } else {
       const msg = await resp.text()
-      alert('点赞操作失败：' + (msg || `HTTP ${resp.status}`))
+      alert(t('store.like_failed', { error: msg || `HTTP ${resp.status}` }))
     }
   } catch (e: any) {
-    alert('网络错误: ' + (e?.message || e))
+    alert(t('store.network_error_colon', { error: e?.message || e }))
   }
 }
 
@@ -608,7 +610,7 @@ async function toggleFavorite(event: Event, entry: string) {
         const favBtn = cardEl.querySelector('.btn-like[data-kind="favorite"]') as HTMLElement
         if (favBtn) {
           favBtn.classList.toggle('favorited', !favorited)
-          favBtn.title = favorited ? '收藏插件' : '取消收藏'
+          favBtn.title = favorited ? t('dev.favorite') : t('dev.unfavorite')
           favBtn.textContent = !favorited ? '⭐' : '☆'
         }
       }
@@ -625,12 +627,12 @@ async function showDetail(entry: string) {
   if (!plugin) return
   detailTitle.value = plugin.name
   const cat = getCategory(plugin.category)
-  detailPluginInfoHtml.value = `<div><span>版本</span><br><strong>${escHtml(plugin.version)}</strong></div>
-    <div><span>作者</span><br><a href="/developer/${encodeURIComponent(plugin.by)}" target="_blank" style="color:var(--accent2)">${escHtml(plugin.by)}</a></div>
-    <div><span>分类</span><br><strong>${cat.icon} ${escHtml(cat.name)}</strong></div>
-    <div><span>下载量</span><br><strong>${plugin.downloads}</strong></div>
-    <div><span>发布日期</span><br><strong>${fmtDate(plugin.published_at)}</strong></div>`
-  detailContentHtml.value = '<div style="text-align:center;padding:20px;color:#666">加载中…</div>'
+  detailPluginInfoHtml.value = `<div><span>${t('dev.field.version')}</span><br><strong>${escHtml(plugin.version)}</strong></div>
+    <div><span>${t('dev.field.author')}</span><br><a href="/developer/${encodeURIComponent(plugin.by)}" target="_blank" style="color:var(--accent2)">${escHtml(plugin.by)}</a></div>
+    <div><span>${t('dev.field.category')}</span><br><strong>${cat.icon} ${escHtml(cat.name)}</strong></div>
+    <div><span>${t('dev.field.downloads')}</span><br><strong>${plugin.downloads}</strong></div>
+    <div><span>${t('dev.field.published')}</span><br><strong>${fmtDate(plugin.published_at)}</strong></div>`
+  detailContentHtml.value = '<div style="text-align:center;padding:20px;color:#666">' + t('common.loading') + '</div>'
   showDetailModal.value = true
   try {
     const resp = await fetch('/plugins/' + encodeURIComponent(entry) + '/readme')
@@ -638,10 +640,10 @@ async function showDetail(entry: string) {
       const text = await resp.text()
       detailContentHtml.value = mdToHtml(text)
     } else {
-      detailContentHtml.value = `<p style="color:var(--text-dim);text-align:center">作者暂未提供详细介绍。</p><p style="color:var(--text-dim);text-align:center">${escHtml(plugin.desc)}</p>`
+      detailContentHtml.value = `<p style="color:var(--text-dim);text-align:center">${t('dev.no_plugin_desc')}</p><p style="color:var(--text-dim);text-align:center">${escHtml(plugin.desc)}</p>`
     }
   } catch (e: any) {
-    detailContentHtml.value = '加载失败：' + e.message
+    detailContentHtml.value = t('dev.load_failed_detail', { error: e.message })
   }
 }
 
@@ -667,7 +669,7 @@ function changeCover(entry: string) {
     const file = input.files?.[0]
     if (!file) return
     if (file.size > 2 * 1024 * 1024) {
-      alert('封面图不能超过 2MB')
+      alert(t('store.cover_too_large'))
       return
     }
     const resp = await fetch(`/plugins/${encodeURIComponent(entry)}/cover`, {
@@ -688,7 +690,7 @@ function changeCover(entry: string) {
         }
       }
     } else {
-      alert('封面上传失败：' + (await resp.text()))
+      alert(t('store.cover_upload_failed', { error: await resp.text() }))
     }
   }
   input.click()
@@ -722,12 +724,12 @@ async function confirmDelete() {
       if (auth.adminToken) auth.clearAdminToken()
       else auth.clearUserAuth()
       showDeleteModal.value = false
-      alert('认证已失效，请重新登录')
+      alert(t('comments.auth_expired'))
     } else {
       deleteErr.value = '❌ ' + (await resp.text())
     }
   } catch (e: any) {
-    deleteErr.value = '❌ 网络错误：' + e.message
+    deleteErr.value = t('common.network_error_detail', { error: e.message })
   }
 }
 
@@ -787,14 +789,14 @@ async function toggleCollectionFollow(collectionId: number, followed: boolean) {
       headers: auth.bearerHeaders() as Record<string, string>,
     })
     if (!resp.ok) {
-      alert('整合包关注操作失败：' + (await resp.text()))
+      alert(t('store.follow_failed', { error: await resp.text() }))
       return
     }
     if (followed) auth.myCollectionFollows.delete(collectionId)
     else auth.myCollectionFollows.add(collectionId)
     await openCollectionsListModal()
   } catch (e: any) {
-    alert('网络错误：' + e.message)
+    alert(t('common.network_error_detail_plain', { error: e.message }))
   }
 }
 
@@ -809,11 +811,11 @@ async function showCollectionPicker(collectionId: number) {
     `<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><input type="checkbox" value="${escHtml(p.entry)}"/> <span>${escHtml(p.name)} <small style="color:var(--text-dim)">(${escHtml(p.entry)})</small></span></label>`,
   ).join('')
   picker.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;max-width:680px;width:100%;padding:14px;max-height:70vh;display:flex;flex-direction:column;">
-    <div style="font-weight:700;color:#fff;margin-bottom:8px">选择要加入整合包的插件</div>
-    <div style="overflow:auto;flex:1">${items || '<div style="color:var(--text-dim)">当前列表为空</div>'}</div>
+    <div style="font-weight:700;color:#fff;margin-bottom:8px">${t('store.picker.title')}</div>
+    <div style="overflow:auto;flex:1">${items || `<div style="color:var(--text-dim)">${t('store.picker.empty')}</div>`}</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-      <button class="btn" id="pickerCancel">取消</button>
-      <button class="btn btn-primary" id="pickerOk">确定</button>
+      <button class="btn" id="pickerCancel">${t('common.cancel')}</button>
+      <button class="btn btn-primary" id="pickerOk">${t('common.confirm')}</button>
     </div>
   </div>`
   document.body.appendChild(picker)
@@ -824,8 +826,8 @@ async function showCollectionPicker(collectionId: number) {
     if (!entries.length) return
     __collectionPickMode.value = { collectionId, entries }
     openCollectionModal()
-    collectionName.value = `整合包-${Date.now()}`
-    collectionDesc.value = '通过卡片选择插件'
+    collectionName.value = t('store.default_pack_name', { ts: Date.now() })
+    collectionDesc.value = t('store.default_pack_desc')
     collectionEntries.value = ''
   })
 }
@@ -833,19 +835,19 @@ async function showCollectionPicker(collectionId: number) {
 async function deleteCollection(collectionId: number, name: string) {
   if (!FEATURE_COLLECTIONS_UI) return
   if (!auth.userAuth) return
-  if (!confirm(`确定删除整合包「${name}」吗？`)) return
+  if (!confirm(t('store.delete_pack_confirm', { name }))) return
   try {
     const resp = await fetch(`/collections/${collectionId}`, {
       method: 'DELETE',
       headers: auth.bearerHeaders() as Record<string, string>,
     })
     if (!resp.ok) {
-      alert('删除失败：' + (await resp.text()))
+      alert(t('store.delete_failed', { error: await resp.text() }))
       return
     }
     await openCollectionsListModal()
   } catch (e: any) {
-    alert('删除失败：' + e.message)
+    alert(t('store.delete_failed', { error: e.message }))
   }
 }
 
@@ -853,14 +855,14 @@ async function createCollectionFromEntries() {
   if (!FEATURE_COLLECTIONS_UI) return
   collectionErr.value = ''
   if (!auth.userAuth) {
-    collectionErr.value = '请先登录'
+    collectionErr.value = t('challenge.need_login')
     return
   }
   const name = collectionName.value.trim()
   const description = collectionDesc.value.trim()
   const raw = collectionEntries.value.trim()
   if (!name) {
-    collectionErr.value = '请输入整合包名称'
+    collectionErr.value = t('pack.need_name')
     return
   }
   let entries = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(line => {
@@ -871,7 +873,7 @@ async function createCollectionFromEntries() {
     entries = __collectionPickMode.value.entries.map((entry, idx) => ({ entry, version: '', sort_order: idx }))
   }
   if (entries.length === 0) {
-    collectionErr.value = '请至少输入一个插件 entry'
+    collectionErr.value = t('store.need_entry')
     return
   }
   const dedup = new Map<string, any>()
@@ -884,7 +886,7 @@ async function createCollectionFromEntries() {
       body: JSON.stringify({ name, description, is_public: true }),
     })
     if (!createResp.ok) {
-      collectionErr.value = '创建整合包失败：' + (await createResp.text())
+      collectionErr.value = t('store.create_failed', { error: await createResp.text() })
       return
     }
     const created = await createResp.json()
@@ -901,14 +903,14 @@ async function createCollectionFromEntries() {
     }
     if (failed.length > 0) {
       await fetch(`/collections/${cid}`, { method: 'DELETE', headers: auth.bearerHeaders() as Record<string, string> })
-      collectionErr.value = `以下 entry 未上架或无效，已取消创建：${failed.join(', ')}`
+      collectionErr.value = t('store.entries_invalid', { list: failed.join(', ') })
       return
     }
     __collectionPickMode.value = null
     showCollectionModal.value = false
-    alert('整合包创建成功，可在后续页面中继续管理和分发。')
+    alert(t('store.create_ok'))
   } catch (e: any) {
-    collectionErr.value = '网络错误：' + e.message
+    collectionErr.value = t('common.network_error_detail_plain', { error: e.message })
   }
 }
 
@@ -951,17 +953,17 @@ async function openNotificationSettings() {
     headers: auth.bearerHeaders() as Record<string, string>,
   })
   if (!resp.ok) {
-    alert('加载通知设置失败')
+    alert(t('store.notif_load_failed'))
     return
   }
   const s = await resp.json()
-  const reply = confirm(`是否开启"被回复通知"？\n当前：${s.reply_notifications ? '开启' : '关闭'}`)
+  const reply = confirm(t('store.notif_reply_confirm', { state: s.reply_notifications ? t('store.notif.on') : t('store.notif.off') }))
   await fetch('/notifications/settings', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...auth.bearerHeaders() } as Record<string, string>,
     body: JSON.stringify({ reply_notifications: reply }),
   })
-  alert('通知设置已更新（当前仅示例入口，后续会做完整设置面板）')
+  alert(t('store.notif_updated'))
 }
 
 // ── Drop zones init ──
@@ -1152,7 +1154,7 @@ async function fetchPacks() {
   const grid = packGridRef.value
   if (!grid) return
   grid.innerHTML =
-    '<div class="grid-loading" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">加载中…</div>'
+    '<div class="grid-loading" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">' + t('common.loading') + '</div>'
   try {
     if (packFilter.value === 'mine') {
       if (!auth.userAuth) {
@@ -1198,7 +1200,7 @@ async function fetchPacks() {
     renderPackPagination(packTotal.value, Math.max(1, Math.ceil(packTotal.value / PACK_PAGE_SIZE)))
   } catch (e: any) {
     grid.innerHTML =
-      '<div class="grid-empty" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">📦 加载失败，请刷新重试</div>'
+      '<div class="grid-empty" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">' + t('store.packs_load_failed') + '</div>'
     renderPackPagination(0, 1)
   }
 }
@@ -1284,7 +1286,7 @@ function renderPackGrid() {
   if (!grid) return
   if (!packItems.value.length) {
     grid.innerHTML =
-      '<div class="grid-empty" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">📦 暂无整合包</div>'
+      '<div class="grid-empty" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">' + t('store.packs_empty') + '</div>'
     return
   }
   grid.innerHTML = packItems.value.map(p => packCardHtml(p)).join('')
@@ -1310,7 +1312,7 @@ function renderPackPagination(total: number, pages: number) {
     prev = p
   }
   html += `<button class="page-btn" onclick="window.__packSetPage(${packPage.value + 1})" ${packPage.value === pages ? 'disabled' : ''}>›</button>`
-  html += `<span style="font-size:0.8rem;color:var(--text-dim);margin-left:6px">共 ${total} 个</span>`
+  html += `<span style="font-size:0.8rem;color:var(--text-dim);margin-left:6px">${t('store.count_suffix', { total })}</span>`
   el.innerHTML = html
 }
 
@@ -1319,7 +1321,7 @@ function packCardHtml(p: any): string {
   const pname = escHtml(p.name)
   const pby = escHtml(p.by)
   const version = escHtml(p.version)
-  const desc = p.desc ? escHtml(p.desc) : '<span style="color:var(--text-dim)">暂无简介</span>'
+  const desc = p.desc ? escHtml(p.desc) : `<span style="color:var(--text-dim)">${t('store.no_desc')}</span>`
   const cat = getCategory(p.category || 'other')
   const catName = escHtml(cat.name)
   const catSlug = escHtml(cat.slug)
@@ -1330,10 +1332,10 @@ function packCardHtml(p: any): string {
     : `<div class="card-cover card-cover-placeholder"><span class="cover-icon">📦</span></div>`
   const mine = isMyPack(p)
   const deleteBtn = canModifyPack(p)
-    ? `<button class="btn-sm btn-danger-sm" onclick="window.__packDelete('${entry}')">🗑 删除</button>`
+    ? `<button class="btn-sm btn-danger-sm" onclick="window.__packDelete('${entry}')">${t('challenge.btn.delete')}</button>`
     : ''
   const coverBtn = mine
-    ? `<button class="btn-sm btn-pack-cover-sm" onclick="window.__packCover('${entry}')">🎨 封面</button>`
+    ? `<button class="btn-sm btn-pack-cover-sm" onclick="window.__packCover('${entry}')">${t('store.btn.cover')}</button>`
     : ''
   return `<div class="plugin-card pack-card" id="pack-card-${entry}">
     ${coverHtml}
@@ -1346,25 +1348,25 @@ function packCardHtml(p: any): string {
         <span class="card-version">v${version}</span>
       </div>
       <div class="card-author">
-        <a href="/developer/${byUrl}" class="author-avatar-link" title="进入 ${pby} 的主页">
+        <a href="/developer/${byUrl}" class="author-avatar-link" title="${t('store.author.home', { name: pby })}">
           <img src="/api/users/${byUrl}/avatar" alt="${pby}" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='👤';" />
         </a>
-        <a href="/developer/${byUrl}" class="author-link" title="查看${pby}的主页">${pby}</a>
+        <a href="/developer/${byUrl}" class="author-link" title="${t('store.author.view', { name: pby })}">${pby}</a>
       </div>
       <div class="card-desc">${desc}</div>
     </div>
     <div class="card-footer">
       <div class="card-stats">
-        <span title="包含插件数">🧩 ${p.plugin_count || 0} 个插件</span>
-        <span title="下载量">⬇ ${p.downloads || 0}</span>
-        <span title="发布日期">📅 ${fmtDate(p.published_at)}</span>
+        <span title="${t('store.plugin_count')}">🧩 ${t('store.plugin_count_value', { count: p.plugin_count || 0 })}</span>
+        <span title="${t('dev.field.downloads')}">⬇ ${p.downloads || 0}</span>
+        <span title="${t('dev.field.published')}">📅 ${fmtDate(p.published_at)}</span>
       </div>
       <div class="card-actions">
-        <button class="btn-sm btn-detail-sm" onclick="window.__packShowDetail('${entry}')">📄 详情</button>
-        <button class="btn-sm btn-comment-sm" onclick="window.__packShowComments('${entry}')">💬 评论 <span id="pcc-${entry}" class="pack-cmt-count">${p.comment_count || 0}</span></button>
+        <button class="btn-sm btn-detail-sm" onclick="window.__packShowDetail('${entry}')">📄 ${t('dev.detail')}</button>
+        <button class="btn-sm btn-comment-sm" onclick="window.__packShowComments('${entry}')">💬 ${t('common.comments')} <span id="pcc-${entry}" class="pack-cmt-count">${p.comment_count || 0}</span></button>
         ${coverBtn}${deleteBtn}
       </div>
-      <div class="pack-card-hint">游戏内安装可自动补装成员插件并支持更新/卸载</div>
+      <div class="pack-card-hint">${t('store.pack_hint')}</div>
     </div>
   </div>`
 }
@@ -1380,13 +1382,13 @@ async function packShowDetail(entry: string) {
   packDetailIsMine.value = false
   packDetailLoading.value = true
   packDetailContentHtml.value =
-    '<div style="text-align:center;padding:24px;color:#666">加载中…</div>'
+    '<div style="text-align:center;padding:24px;color:#666">' + t('common.loading') + '</div>'
   showPackDetailModal.value = true
   try {
     const resp = await fetch('/packs/' + encodeURIComponent(entry))
     if (!resp.ok) {
       packDetailContentHtml.value =
-        '<p style="color:var(--danger);text-align:center">加载失败（HTTP ' + resp.status + '）</p>'
+        '<p style="color:var(--danger);text-align:center">' + t('store.load_failed_http', { status: resp.status }) + '</p>'
       packDetailLoading.value = false
       return
     }
@@ -1407,12 +1409,12 @@ async function packShowDetail(entry: string) {
       ? `<a href="/developer/${encodeURIComponent(pack.by)}" target="_blank" style="color:var(--accent2)">${escHtml(pack.by)}</a>`
       : '—'
     const cat = getCategory(pack.category || 'other')
-    packDetailInfoHtml.value = `<div><span>版本</span><br><strong>${escHtml(pack.version)}</strong></div>
-    <div><span>分类</span><br><strong>${cat.icon} ${escHtml(cat.name)}</strong></div>
-    <div><span>作者</span><br>${author}</div>
-    <div><span>包含插件</span><br><strong>🧩 ${pack.plugin_count ?? members.length}</strong></div>
-    <div><span>下载量</span><br><strong>${pack.downloads ?? 0}</strong></div>
-    <div><span>发布日期</span><br><strong>${fmtDate(pack.published_at)}</strong></div>
+    packDetailInfoHtml.value = `<div><span>${t('dev.field.version')}</span><br><strong>${escHtml(pack.version)}</strong></div>
+    <div><span>${t('dev.field.category')}</span><br><strong>${cat.icon} ${escHtml(cat.name)}</strong></div>
+    <div><span>${t('dev.field.author')}</span><br>${author}</div>
+    <div><span>${t('store.field.plugin_count')}</span><br><strong>🧩 ${pack.plugin_count ?? members.length}</strong></div>
+    <div><span>${t('dev.field.downloads')}</span><br><strong>${pack.downloads ?? 0}</strong></div>
+    <div><span>${t('dev.field.published')}</span><br><strong>${fmtDate(pack.published_at)}</strong></div>
     <div><span>entry</span><br><strong>${escHtml(pack.entry)}</strong></div>`
     let readmeHtml: string
     if (readme.trim()) {
@@ -1420,13 +1422,13 @@ async function packShowDetail(entry: string) {
     } else if (pack.desc) {
       readmeHtml = `<div class="pack-desc-fallback">${escHtml(pack.desc)}</div>`
     } else {
-      readmeHtml = '<p style="color:var(--text-dim);text-align:center">作者暂未提供简介。</p>'
+      readmeHtml = '<p style="color:var(--text-dim);text-align:center">' + t('store.no_readme') + '</p>'
     }
     packDetailContentHtml.value = readmeHtml + packMembersHtml(members)
     packDetailLoading.value = false
   } catch (e: any) {
     packDetailContentHtml.value =
-      '<p style="color:var(--danger);text-align:center">加载失败：' + escHtml(e?.message || String(e)) + '</p>'
+      '<p style="color:var(--danger);text-align:center">' + t('dev.load_failed_detail', { error: escHtml(e?.message || String(e)) }) + '</p>'
     packDetailLoading.value = false
   }
 }
@@ -1443,9 +1445,9 @@ function packMembersHtml(members: any[]): string {
           : '—')
       : '—'
     const downloads = m.exists ? (m.downloads ?? 0) : '—'
-    const offBadge = m.exists ? '' : ' <span class="pack-off-badge">已下架</span>'
+    const offBadge = m.exists ? '' : ` <span class="pack-off-badge">${t('store.off_shelf')}</span>`
     const viewBtn = m.exists
-      ? `<button class="btn-sm btn-detail-sm" onclick="window.__packJumpToPlugin('${mentry}')">查看插件</button>`
+      ? `<button class="btn-sm btn-detail-sm" onclick="window.__packJumpToPlugin('${mentry}')">${t('store.view_plugin')}</button>`
       : ''
     return `<tr>
       <td><span class="pack-member-name">${displayName}</span>${offBadge}<div class="pack-member-entry">${mentry}</div></td>
@@ -1453,9 +1455,9 @@ function packMembersHtml(members: any[]): string {
     </tr>`
   }).join('')
   return `<div class="pack-members-block">
-    <div class="pack-members-title">🧩 成员插件（${members.length}）</div>
+    <div class="pack-members-title">${t('store.members_title', { count: members.length })}</div>
     <div class="pack-table-wrap"><table class="pack-member-table">
-      <thead><tr><th>插件</th><th>版本</th><th>作者</th><th>下载量</th><th></th></tr></thead>
+      <thead><tr><th>${t('store.table.plugin')}</th><th>${t('dev.field.version')}</th><th>${t('dev.field.author')}</th><th>${t('dev.field.downloads')}</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
   </div>`
@@ -1491,19 +1493,19 @@ async function packJumpToPlugin(entry: string) {
     }
   } catch (e: any) {
     // 网络失败走回退路径
-    console.error('packJumpToPlugin /plugins/entries 失败：', e)
+    console.error(t('store.log.jump_failed'), e)
   }
   // 3) 未命中 → 回退：切到插件商店并把 entry 作为搜索词，提示找不到
   currentSearch.value = entry
   currentPage.value = 1
   fetchPage()
   window.scrollTo({ top: 0, behavior: 'smooth' })
-  alert(`插件「${entry}」未在商店上架或查询失败，已切换到插件商店搜索。`)
+  alert(t('store.jump_failed', { entry }))
 }
 
 // ── Packs: delete ──
 async function packDeleteEntry(entry: string, name: string) {
-  if (!confirm(`确定删除整合包「${name}」？\npack.lua/README 与封面将一并删除，此操作不可撤销。`)) return
+  if (!confirm(t('store.delete_pack_confirm_full', { name }))) return
   const headers = auth.adminToken
     ? auth.adminHeaders()
     : auth.bearerHeaders()
@@ -1517,7 +1519,7 @@ async function packDeleteEntry(entry: string, name: string) {
       headers: headers as Record<string, string>,
     })
     if (resp.ok) {
-      packShowNotice(`🗑 已删除整合包「${name}」`)
+      packShowNotice(t('store.pack_deleted', { name }))
       packInvalidateMineCache()
       packEditEntry.value = null
       packCloseModal('packDetailModal')
@@ -1527,12 +1529,12 @@ async function packDeleteEntry(entry: string, name: string) {
       if (auth.adminToken) auth.clearAdminToken()
       else auth.clearUserAuth()
       packCloseModal('packDetailModal')
-      alert('认证已失效，请重新登录')
+      alert(t('comments.auth_expired'))
     } else {
-      alert('删除失败：' + (await resp.text()))
+      alert(t('store.delete_failed', { error: await resp.text() }))
     }
   } catch (e: any) {
-    alert('删除失败：' + e.message)
+    alert(t('store.delete_failed', { error: e.message }))
   }
 }
 
@@ -1575,17 +1577,17 @@ async function packOpenEditModal(entry: string) {
   try {
     const resp = await fetch('/packs/' + encodeURIComponent(entry))
     if (!resp.ok) {
-      alert('加载失败（HTTP ' + resp.status + '）')
+      alert(t('store.load_failed_http', { status: resp.status }))
       return
     }
     data = await resp.json()
   } catch (e: any) {
-    alert('加载失败：' + e.message)
+    alert(t('dev.load_failed_detail', { error: e.message }))
     return
   }
   const pack = data?.pack || {}
   if (!isMyPack(pack)) {
-    alert('只能编辑自己发布的整合包（需以作者账号登录；管理员无法代为编辑）')
+    alert(t('store.pack_edit_forbidden'))
     return
   }
   const readme: string = typeof data.readme === 'string' ? data.readme : ''
@@ -1673,7 +1675,7 @@ function packAddManualMember() {
   for (const part of parts) {
     const entry = part.replace(/^@/, '')
     if (!/^[A-Za-z0-9_-]+$/.test(entry)) {
-      packCreateErr.value = `「${entry}」不是合法的插件 entry（仅字母/数字/_/-）`
+      packCreateErr.value = t('pack.invalid_entry', { entry })
       continue
     }
     if (!packMembers.value.includes(entry)) {
@@ -1692,35 +1694,35 @@ function packRemoveMember(entry: string) {
 async function packCreateSubmit() {
   packCreateErr.value = ''
   if (!auth.userAuth) {
-    packCreateErr.value = '请先登录'
+    packCreateErr.value = t('challenge.need_login')
     return
   }
   const name = packFormName.value.trim()
   const version = packFormVersion.value.trim()
   if (!name) {
-    packCreateErr.value = '请输入整合包名称'
+    packCreateErr.value = t('pack.need_name')
     return
   }
   if (name.length > 60) {
-    packCreateErr.value = '名称不能超过 60 字符'
+    packCreateErr.value = t('pack.name_too_long')
     return
   }
   if (!version) {
-    packCreateErr.value = '请输入版本号'
+    packCreateErr.value = t('pack.need_version')
     return
   }
   if (version.length > 30) {
-    packCreateErr.value = '版本不能超过 30 字符'
+    packCreateErr.value = t('pack.version_too_long')
     return
   }
   const entries = packMembers.value.filter(Boolean)
   if (!entries.length) {
-    packCreateErr.value = '请至少选择一个成员插件'
+    packCreateErr.value = t('pack.need_member')
     return
   }
   const entry = packFormEntry.value.trim()
   if (!packEditEntry.value && entry && !/^[A-Za-z0-9_-]+$/.test(entry)) {
-    packCreateErr.value = 'entry 只能包含字母、数字、下划线或中划线（留空则自动生成）'
+    packCreateErr.value = t('pack.entry_charset')
     return
   }
   const editEntry = packEditEntry.value
@@ -1742,7 +1744,7 @@ async function packCreateSubmit() {
     if (!resp.ok) {
       if (resp.status === 401) {
         auth.clearUserAuth()
-        packCreateErr.value = '登录已失效，请重新登录'
+        packCreateErr.value = t('comments.login_expired_plain')
         return
       }
       packCreateErr.value = '❌ ' + text
@@ -1752,17 +1754,17 @@ async function packCreateSubmit() {
     packEditEntry.value = null
     packInvalidateMineCache()
     if (editEntry) {
-      packShowNotice(`✅ 整合包「${name}」已更新`, editEntry)
+      packShowNotice(t('pack.updated', { name }), editEntry)
     } else {
       let createdEntry = ''
       try {
         createdEntry = (JSON.parse(text) as any).entry || ''
       } catch (_) { /* ignore */ }
-      packShowNotice(`✅ 创建成功！整合包 entry = ${createdEntry || name}`, createdEntry || name)
+      packShowNotice(t('pack.created', { entry: createdEntry || name }), createdEntry || name)
     }
     fetchPacks()
   } catch (e: any) {
-    packCreateErr.value = '❌ 网络错误：' + e.message
+    packCreateErr.value = t('common.network_error_detail', { error: e.message })
   } finally {
     packCreateSubmitting.value = false
   }
@@ -1781,7 +1783,7 @@ function packUploadCover(entry: string) {
     const f = input.files?.[0]
     if (!f) return
     if (f.size > 5 * 1024 * 1024) {
-      alert('封面图不能超过 5MB')
+      alert(t('store.cover_too_large_5mb'))
       return
     }
     try {
@@ -1794,15 +1796,15 @@ function packUploadCover(entry: string) {
         packRefreshCardCover(entry)
         const p = packItems.value.find(x => x.entry === entry)
         if (p) p.has_cover = true
-        packShowNotice('✅ 封面已更新')
+        packShowNotice(t('store.cover_updated'))
       } else if (resp.status === 401) {
         auth.clearUserAuth()
-        alert('登录已失效，请重新登录')
+        alert(t('comments.login_expired_plain'))
       } else {
-        alert('封面上传失败：' + (await resp.text()))
+        alert(t('store.cover_upload_failed', { error: await resp.text() }))
       }
     } catch (e: any) {
-      alert('网络错误：' + e.message)
+      alert(t('common.network_error_detail_plain', { error: e.message }))
     }
   }
   input.click()
@@ -1914,7 +1916,7 @@ watch(
   <div class="page-wrap" style="max-width:clamp(900px,94vw,1500px);">
     <!-- ── Top bar ── -->
     <div class="top-bar">
-      <h1>{{ storeView === 'packs' ? '📦 整合包商店' : '🧩 插件商店' }}</h1>
+      <h1>{{ storeView === 'packs' ? t('store.title.packs') : t('store.title.plugins') }}</h1>
       <div class="view-switch" id="storeViewSwitch">
         <button
           type="button"
@@ -1922,7 +1924,7 @@ watch(
           :class="{ active: storeView === 'plugins' }"
           @click="switchStoreView('plugins')"
         >
-          🧩 插件
+          🧩 {{ t('store.tab.plugins') }}
         </button>
         <button
           type="button"
@@ -1930,7 +1932,7 @@ watch(
           :class="{ active: storeView === 'packs' }"
           @click="switchStoreView('packs')"
         >
-          📦 整合包
+          📦 {{ t('store.tab.packs') }}
         </button>
       </div>
       <div class="top-bar-actions">
@@ -1939,27 +1941,27 @@ watch(
           class="btn btn-collection"
           @click="openCollectionModal()"
         >
-          🧰 创建整合包
+          🧰 {{ t('pack.create') }}
         </button>
         <button
           v-if="FEATURE_COLLECTIONS_UI"
           class="btn"
           @click="openCollectionsListModal()"
         >
-          📚 整合包广场
+          📚 {{ t('store.tab.plaza') }}
         </button>
         <button class="btn" @click="openNotificationsModal()">
-          🔔 消息
+          🔔 {{ t('store.tab.notifications') }}
         </button>
         <a
           class="btn btn-me"
           id="myProfileBtn"
           :href="meBtnHref"
           :style="{ display: meBtnDisplay }"
-          title="进入我的主页"
+          :title="t('store.my_profile_title')"
         >
           <span class="btn-me-avatar" id="myProfileAvatar" v-html="meAvatarHtml"></span>
-          <span>我的主页</span>
+          <span>{{ t('store.my_profile') }}</span>
         </a>
         <button
           class="btn btn-user"
@@ -1984,20 +1986,20 @@ watch(
     <div class="packs-panel" v-show="storeView === 'packs'">
       <div class="packs-toolbar">
         <div class="packs-actions">
-          <button class="btn btn-pack-create" @click="packOpenCreateModal()">🧰 创建整合包</button>
+          <button class="btn btn-pack-create" @click="packOpenCreateModal()">🧰 {{ t('pack.create') }}</button>
           <span class="packs-actions-divider"></span>
-          <button class="chip" :class="{ active: packFilter === 'all' }" @click="packSetFilter('all')">全部</button>
+          <button class="chip" :class="{ active: packFilter === 'all' }" @click="packSetFilter('all')">{{ t('category.all') }}</button>
           <button
             v-if="auth.userAuth"
             class="chip"
             :class="{ active: packFilter === 'mine' }"
             @click="packSetFilter('mine')"
-          >我发布的</button>
+          >{{ t('store.filter.mine') }}</button>
         </div>
         <div class="packs-notice" v-if="packNotice">
           <span>{{ packNotice.text }}</span>
-          <button v-if="packNotice.entry" class="btn-sm btn-detail-sm" @click="packShowDetail(packNotice.entry || '')">📄 查看</button>
-          <button class="btn-sm" title="关闭" @click="packClearNotice()">×</button>
+          <button v-if="packNotice.entry" class="btn-sm btn-detail-sm" @click="packShowDetail(packNotice.entry || '')">{{ t('store.btn.view') }}</button>
+          <button class="btn-sm" :title="t('common.close')" @click="packClearNotice()">×</button>
         </div>
         <div class="category-chips pack-cat-chips">
           <button
@@ -2019,18 +2021,18 @@ watch(
           <input
             type="search"
             v-model="packSearch"
-            placeholder="搜索整合包名称、作者或描述…"
+            :placeholder="t('pack.search_placeholder')"
             @input="onPackSearch()"
             autocomplete="off"
           />
           <div class="sort-btns">
-            <button class="btn-sort" :class="{ active: packSort === 'newest' }" @click="packSetSort('newest')">🆕 最新</button>
-            <button class="btn-sort" :class="{ active: packSort === 'downloads' }" @click="packSetSort('downloads')">⬇ 下载</button>
-            <button class="btn-sort" :class="{ active: packSort === 'hot' }" @click="packSetSort('hot')">🔥 热度</button>
+            <button class="btn-sort" :class="{ active: packSort === 'newest' }" @click="packSetSort('newest')">{{ t('store.sort.newest') }}</button>
+            <button class="btn-sort" :class="{ active: packSort === 'downloads' }" @click="packSetSort('downloads')">{{ t('store.sort.downloads') }}</button>
+            <button class="btn-sort" :class="{ active: packSort === 'hot' }" @click="packSetSort('hot')">{{ t('store.sort.hot') }}</button>
           </div>
         </div>
         <p class="pack-install-hint">
-          整合包只能在游戏内安装：游戏 → 插件管理器 → 商店 → 整合包，会自动装齐包内全部插件。
+          {{ t('store.pack_install_hint') }}
         </p>
       </div>
 
@@ -2044,17 +2046,17 @@ watch(
 
     <!-- ── Upload box ── -->
     <div class="upload-box" v-show="storeView === 'plugins'">
-      <h2>📤 上传插件</h2>
+      <h2>📤 {{ t('store.upload.title') }}</h2>
       <div
         id="uploadLoginNotice"
         class="login-notice"
         :style="{ display: uploadLoginNoticeDisplay }"
       >
-        ⚠️ 请先登录账户才能上传插件。
+        {{ t('store.upload.need_login') }}
       </div>
       <div class="upload-row">
         <div class="upload-col">
-          <label>插件包（.zip）</label>
+          <label>{{ t('store.upload.zip_label') }}</label>
           <div
             class="drop-zone"
             :class="{ 'has-file': _zipHasFile }"
@@ -2070,12 +2072,12 @@ watch(
             />
             <div class="drop-zone-icon">📦</div>
             <div class="drop-zone-label" id="zipDropLabel">
-              {{ _zipHasFile ? `📦 ${_zipFileName}` : '拖拽 .zip 到此，或点击选择' }}
+              {{ _zipHasFile ? `📦 ${_zipFileName}` : t('store.upload.drop') }}
             </div>
           </div>
         </div>
         <div class="upload-col">
-          <label>封面图（可选，≤2MB，800 x 450，jpg/png/webp）</label>
+          <label>{{ t('store.upload.cover_label') }}</label>
           <div
             class="drop-zone"
             :class="{ 'has-file': _coverHasFile }"
@@ -2090,7 +2092,7 @@ watch(
               @click="($event.target as HTMLInputElement).value = ''"
             />
             <div class="cover-preview" id="coverPreview" ref="coverPreviewRef">
-              <img v-if="_coverPreviewUrl" :src="_coverPreviewUrl" alt="封面预览" />
+              <img v-if="_coverPreviewUrl" :src="_coverPreviewUrl" :alt="t('store.upload.cover_preview')" />
               <span v-else>🖼</span>
             </div>
           </div>
@@ -2105,27 +2107,15 @@ watch(
           flex-wrap: wrap;
         "
       >
-        <button class="btn btn-primary" @click="uploadPlugin()">上传</button>
+        <button class="btn btn-primary" @click="uploadPlugin()">{{ t('store.upload.submit') }}</button>
         <span
           id="uploadStatus"
           :style="{ color: uploadStatusColor }"
         >{{ uploadStatusText }}</span>
       </div>
-      <p class="upload-hint">
-        插件包顶层应包含 <code>config.lua</code> 和
-        <code>$entry.lua</code>。同一 entry
-        会覆盖旧版本（仅限本人）。
-      </p>
-      <p class="upload-hint">
-        下载后放到
-        <code>存档目录/plugins</code>
-        目录并解压即完成安装。请注意，应保证可以找到
-        <code>存档目录/plugins/$entry/config.lua</code
-        >，否则插件无法被识别！
-      </p>
-      <p class="upload-hint">
-        如非必要，建议使用游戏内置的插件商店进行下载。内置的插件商店能够自行完成插件安装，并允许玩家删除、检查更新。
-      </p>
+      <p class="upload-hint" v-html="t('store.help.pkg')"></p>
+      <p class="upload-hint" v-html="t('store.help.install')"></p>
+      <p class="upload-hint" v-html="t('store.help.recommend')"></p>
     </div>
 
     <!-- ── Filter & Sort ── -->
@@ -2150,7 +2140,7 @@ watch(
           type="search"
           id="searchBox"
           ref="searchBoxRef"
-          placeholder="搜索插件名称、作者或描述…"
+          :placeholder="t('store.search_placeholder')"
           v-model="currentSearch"
           @input="onSearch()"
           autocomplete="off"
@@ -2162,7 +2152,7 @@ watch(
             id="sort-hot"
             @click="setSort('hot')"
           >
-            🔥 热度
+            🔥 {{ t('store.sort.hot') }}
           </button>
           <button
             class="btn-sort"
@@ -2170,7 +2160,7 @@ watch(
             id="sort-downloads"
             @click="setSort('downloads')"
           >
-            ⬇ 下载
+            ⬇ {{ t('store.sort.downloads') }}
           </button>
           <button
             class="btn-sort"
@@ -2178,7 +2168,7 @@ watch(
             id="sort-newest"
             @click="setSort('newest')"
           >
-            🆕 最新
+            🆕 {{ t('store.sort.newest') }}
           </button>
         </div>
       </div>
@@ -2202,26 +2192,26 @@ watch(
     >
       <div class="modal">
         <div class="modal-header">
-          <h3>🧰 创建整合包</h3>
+          <h3>🧰 {{ t('pack.create') }}</h3>
           <button class="modal-close" @click="closeModal('collectionModal')">×</button>
         </div>
-        <label>名称</label>
+        <label>{{ t('pack.field.name') }}</label>
         <input
           type="text"
           id="collectionName"
           v-model="collectionName"
-          placeholder="例如：我的防御塔平衡包"
+          :placeholder="t('pack.name_placeholder')"
           maxlength="100"
         />
-        <label>描述</label>
+        <label>{{ t('pack.field.desc') }}</label>
         <input
           type="text"
           id="collectionDesc"
           v-model="collectionDesc"
-          placeholder="可选，最多500字"
+          :placeholder="t('pack.desc_placeholder')"
           maxlength="500"
         />
-        <label>插件 Entry 列表（每行一个，可附版本，如 entry@1.2.0）</label>
+        <label>{{ t('pack.field.entries') }}</label>
         <textarea
           id="collectionEntries"
           v-model="collectionEntries"
@@ -2244,14 +2234,11 @@ watch(
             color: var(--text-dim);
             margin-top: 6px;
           "
-        >
-          系统会只按
-          <code>entry</code>
-          校验是否在商店存在，版本信息用于备注展示。
-        </p>
+          v-html="t('pack.entries_hint')"
+        ></p>
         <div class="modal-btns">
-          <button class="btn" @click="closeModal('collectionModal')">取消</button>
-          <button class="btn btn-primary" @click="createCollectionFromEntries()">创建</button>
+          <button class="btn" @click="closeModal('collectionModal')">{{ t('common.cancel') }}</button>
+          <button class="btn btn-primary" @click="createCollectionFromEntries()">{{ t('pack.create.submit') }}</button>
         </div>
         <div class="modal-err" id="collectionErr">{{ collectionErr }}</div>
       </div>
@@ -2267,7 +2254,7 @@ watch(
     >
       <div class="modal">
         <div class="modal-header">
-          <h3>📚 整合包广场</h3>
+          <h3>📚 {{ t('store.tab.plaza') }}</h3>
           <button class="modal-close" @click="closeModal('collectionsListModal')">×</button>
         </div>
         <div
@@ -2278,15 +2265,15 @@ watch(
             flex-wrap: wrap;
           "
         >
-          <button class="btn-sm" @click="setCollectionsFilter('all')">全部</button>
-          <button class="btn-sm" @click="setCollectionsFilter('mine')">我创建的</button>
+          <button class="btn-sm" @click="setCollectionsFilter('all')">{{ t('category.all') }}</button>
+          <button class="btn-sm" @click="setCollectionsFilter('mine')">{{ t('store.plaza.mine') }}</button>
         </div>
         <div
           id="collectionsListContent"
           style="max-height: 55vh; overflow: auto"
         >
-          <div v-if="collectionsLoading" style="padding:12px;color:var(--text-dim)">加载中…</div>
-          <div v-else-if="collectionsList.length === 0" style="padding:12px;color:var(--text-dim)">暂无整合包。</div>
+          <div v-if="collectionsLoading" style="padding:12px;color:var(--text-dim)">{{ t('common.loading') }}</div>
+          <div v-else-if="collectionsList.length === 0" style="padding:12px;color:var(--text-dim)">{{ t('store.plaza.empty') }}</div>
           <div
             v-for="c in collectionsList"
             :key="c.id"
@@ -2296,30 +2283,30 @@ watch(
               <div style="font-weight:700;color:#fff">{{ escHtml(c.name) }}</div>
               <span
                 :style="{ fontSize: '.72rem', color: c.is_public ? '#69db7c' : '#ffa94d', border: `1px solid ${c.is_public ? '#2b8a3e' : '#a86a2f'}`, padding: '1px 6px', borderRadius: '10px' }"
-              >{{ c.is_public ? '公开' : '私有' }}</span>
+              >{{ c.is_public ? t('store.visibility.public') : t('store.visibility.private') }}</span>
             </div>
             <div style="font-size:0.8rem;color:var(--text-dim);margin:4px 0 8px">
-              作者：{{ escHtml(c.creator_username) }} · 插件：{{ c.plugin_count || 0 }} · 关注：{{ c.follower_count || 0 }}
+              {{ t('store.plaza.meta', { author: escHtml(c.creator_username), plugins: c.plugin_count || 0, followers: c.follower_count || 0 }) }}
             </div>
-            <div style="font-size:0.85rem;color:var(--text-dim);margin:4px 0 10px">{{ escHtml(c.description || '暂无描述') }}</div>
+            <div style="font-size:0.85rem;color:var(--text-dim);margin:4px 0 10px">{{ escHtml(c.description || t('store.no_desc_short')) }}</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <a class="btn-sm" :href="`/collections/${c.id}/download`">⬇ 下载整合包</a>
+              <a class="btn-sm" :href="`/collections/${c.id}/download`">{{ t('store.btn.download_pack') }}</a>
               <a
                 v-if="auth.userAuth && c.creator_username === auth.userAuth.username"
                 class="btn-sm"
                 href="javascript:void(0)"
                 @click="showCollectionPicker(c.id)"
-              >➕ 选择插件</a>
+              >{{ t('store.btn.select_plugins') }}</a>
               <button
                 v-if="auth.userAuth && c.creator_username !== auth.userAuth.username && c.is_public"
                 class="btn-sm"
                 @click="toggleCollectionFollow(c.id, auth.myCollectionFollows.has(c.id))"
-              >{{ auth.myCollectionFollows.has(c.id) ? '💔 取消关注' : '⭐ 关注整合包' }}</button>
+              >{{ auth.myCollectionFollows.has(c.id) ? t('store.unfollow') : t('store.follow_pack') }}</button>
               <button
                 v-if="auth.userAuth && c.creator_username === auth.userAuth.username"
                 class="btn-sm btn-danger-sm"
                 @click="deleteCollection(c.id, c.name)"
-              >🗑 删除</button>
+              >{{ t('challenge.btn.delete') }}</button>
             </div>
           </div>
         </div>
@@ -2335,7 +2322,7 @@ watch(
     >
       <div class="modal">
         <div class="modal-header">
-          <h3>🔔 消息中心</h3>
+          <h3>🔔 {{ t('store.notif.title') }}</h3>
           <button class="modal-close" @click="closeModal('notificationsModal')">×</button>
         </div>
         <div
@@ -2346,15 +2333,15 @@ watch(
             flex-wrap: wrap;
           "
         >
-          <button class="btn-sm" @click="markAllNotificationsRead()">全部标已读</button>
-          <button class="btn-sm" @click="openNotificationSettings()">通知设置</button>
+          <button class="btn-sm" @click="markAllNotificationsRead()">{{ t('store.notif.mark_all') }}</button>
+          <button class="btn-sm" @click="openNotificationSettings()">{{ t('store.notif.settings') }}</button>
         </div>
         <div
           id="notificationsContent"
           style="max-height: 55vh; overflow: auto"
         >
-          <div v-if="notificationLoading" style="padding:12px;color:var(--text-dim)">加载中…</div>
-          <div v-else-if="notificationList.length === 0" style="padding:12px;color:var(--text-dim)">暂无消息。</div>
+          <div v-if="notificationLoading" style="padding:12px;color:var(--text-dim)">{{ t('common.loading') }}</div>
+          <div v-else-if="notificationList.length === 0" style="padding:12px;color:var(--text-dim)">{{ t('store.notif.empty') }}</div>
           <div
             v-for="n in notificationList"
             :key="n.id"
@@ -2377,7 +2364,7 @@ watch(
     >
       <div class="modal">
         <div class="modal-header">
-          <h3>👤 用户账户</h3>
+          <h3>👤 {{ t('challenge.user.title') }}</h3>
           <button class="modal-close" @click="closeModal('userModal')">×</button>
         </div>
         <div class="modal-tabs">
@@ -2387,7 +2374,7 @@ watch(
             id="tabLogin"
             @click="switchUserTab('login')"
           >
-            登录
+            {{ t('challenge.user.tab.login') }}
           </button>
           <button
             class="modal-tab"
@@ -2395,64 +2382,55 @@ watch(
             id="tabRegister"
             @click="switchUserTab('register')"
           >
-            注册
+            {{ t('challenge.user.tab.register') }}
           </button>
         </div>
         <div v-show="_userTab === 'login'" id="loginForm">
-          <label>用户名</label>
+          <label>{{ t('common.username') }}</label>
           <input
             type="text"
             id="loginUsername"
             ref="loginUsernameRef"
             v-model="loginUsername"
-            placeholder="用户名"
+            :placeholder="t('common.username')"
             autocomplete="username"
             @keydown.enter="confirmUser()"
           />
-          <label>密码</label>
+          <label>{{ t('common.password') }}</label>
           <input
             type="password"
             id="loginPassword"
             v-model="loginPassword"
-            placeholder="密码"
+            :placeholder="t('common.password')"
             autocomplete="current-password"
             @keydown.enter="confirmUser()"
           />
         </div>
         <div v-show="_userTab === 'register'" id="registerForm">
-          <label>用户名</label>
+          <label>{{ t('common.username') }}</label>
           <input
             type="text"
             id="regUsername"
             v-model="regUsername"
-            placeholder="用户名（最长 32 字符）"
+            :placeholder="t('store.user.username_long')"
             autocomplete="username"
             @keydown.enter="confirmUser()"
           />
-          <label>密码</label>
+          <label>{{ t('common.password') }}</label>
           <input
             type="password"
             id="regPassword"
             v-model="regPassword"
-            placeholder="密码（至少 6 位）"
+            :placeholder="t('store.user.password_short')"
             autocomplete="new-password"
             @keydown.enter="confirmUser()"
           />
-          <p
-            style="
-              margin: 0 0 4px;
-              font-size: 11px;
-              color: #888;
-            "
-          >
-            用户名注册后不可修改，应与插件 config.lua 中的
-            <code>by</code> 字段相同。
-          </p>
+          <p style="margin: 0 0 4px; font-size: 11px; color: #888;" v-html="t('store.user.username_hint')"></p>
         </div>
         <div class="modal-btns">
-          <button class="btn" @click="closeModal('userModal')">取消</button>
+          <button class="btn" @click="closeModal('userModal')">{{ t('common.cancel') }}</button>
           <button class="btn btn-primary" id="userConfirmBtn" @click="confirmUser()">
-            {{ _userTab === 'login' ? '登录' : '注册' }}
+            {{ _userTab === 'login' ? t('challenge.user.tab.login') : t('challenge.user.tab.register') }}
           </button>
         </div>
         <div class="modal-err" id="userErr">{{ userErr }}</div>
@@ -2468,7 +2446,7 @@ watch(
     >
       <div class="modal">
         <div class="modal-header">
-          <h3>🔑 管理员模式</h3>
+          <h3>🔑 {{ t('store.admin.title') }}</h3>
           <button class="modal-close" @click="closeModal('adminModal')">×</button>
         </div>
         <p
@@ -2478,20 +2456,20 @@ watch(
             color: var(--text-dim);
           "
         >
-          输入管理员 Token，验证通过后可删除任意插件和评论。
+          {{ t('store.admin.hint') }}
         </p>
         <input
           type="password"
           id="adminTokenInput"
           ref="adminTokenInputRef"
           v-model="adminTokenInput"
-          placeholder="管理员 Token"
+          :placeholder="t('store.admin.token_placeholder')"
           @keydown.enter="confirmAdmin()"
         />
         <div class="modal-btns">
-          <button class="btn" @click="closeModal('adminModal')">取消</button>
+          <button class="btn" @click="closeModal('adminModal')">{{ t('common.cancel') }}</button>
           <button class="btn btn-primary" :disabled="adminSubmitting" @click="confirmAdmin()">
-            {{ adminSubmitting ? '验证中…' : '确认' }}
+            {{ adminSubmitting ? t('traffic.auth.submitting') : t('store.admin.confirm') }}
           </button>
         </div>
         <div class="modal-err" id="adminErr">{{ adminErr }}</div>
@@ -2507,7 +2485,7 @@ watch(
     >
       <div class="modal">
         <div class="modal-header">
-          <h3>🗑 删除插件</h3>
+          <h3>🗑 {{ t('store.delete.title') }}</h3>
           <button class="modal-close" @click="closeModal('deleteModal')">×</button>
         </div>
         <p
@@ -2517,11 +2495,11 @@ watch(
             color: var(--text-dim);
           "
         >
-          确认删除 "<strong id="deleteName">{{ deleteName }}</strong>"？此操作不可撤销。
+          {{ t('store.delete.confirm_before') }} "<strong id="deleteName">{{ deleteName }}</strong>"{{ t('store.delete.confirm_after') }}
         </p>
         <div class="modal-btns">
-          <button class="btn" @click="closeModal('deleteModal')">取消</button>
-          <button class="btn btn-danger" @click="confirmDelete()">确认删除</button>
+          <button class="btn" @click="closeModal('deleteModal')">{{ t('common.cancel') }}</button>
+          <button class="btn btn-danger" @click="confirmDelete()">{{ t('store.delete.submit') }}</button>
         </div>
         <div class="modal-err" id="deleteErr">{{ deleteErr }}</div>
       </div>
@@ -2546,12 +2524,12 @@ watch(
             v-if="packDetailIsMine"
             class="btn-sm btn-pack-edit-sm"
             @click="packOpenEditModal(packDetailEntry)"
-          >✏️ 编辑整合包</button>
+          >{{ t('pack.edit') }}</button>
           <span style="flex:1"></span>
           <button
             class="btn-sm btn-danger-sm"
             @click="packDeleteEntry(packDetailEntry, packDetailTitle)"
-          >🗑 删除整合包</button>
+          >{{ t('pack.delete') }}</button>
         </div>
         <div class="modal-body" id="packDetailContent" v-html="packDetailContentHtml"></div>
       </div>
@@ -2566,23 +2544,23 @@ watch(
     >
       <div class="modal large pack-create-modal">
         <div class="modal-header">
-          <h3>{{ packEditEntry ? '✏️ 编辑整合包' : '🧰 创建整合包' }}</h3>
+          <h3>{{ packEditEntry ? t('pack.edit') : '🧰 ' + t('pack.create') }}</h3>
           <button class="modal-close" @click="packCloseModal('packCreateModal')">×</button>
         </div>
         <div class="modal-scroll">
           <template v-if="packEditEntry">
-            <label>entry（不可修改）</label>
+            <label>{{ t('pack.field.entry_locked') }}</label>
             <div class="pack-entry-readonly">{{ packEditEntry }}</div>
           </template>
           <template v-else>
-            <label>entry（可选，留空由服务端自动生成）</label>
-            <input type="text" v-model="packFormEntry" placeholder="pack_my_kit（字母/数字/_/-）" maxlength="64" />
+            <label>{{ t('pack.field.entry_optional') }}</label>
+            <input type="text" v-model="packFormEntry" :placeholder="t('pack.entry_placeholder')" maxlength="64" />
           </template>
-          <label>名称 *</label>
-          <input type="text" v-model="packFormName" placeholder="例如：我的塔防整合包" maxlength="60" />
-          <label>版本 *</label>
+          <label>{{ t('pack.field.name_required') }}</label>
+          <input type="text" v-model="packFormName" :placeholder="t('pack.name_placeholder2')" maxlength="60" />
+          <label>{{ t('pack.field.version_required') }}</label>
           <input type="text" v-model="packFormVersion" placeholder="1.0.0" maxlength="30" />
-          <label>分类（未选择则默认「其他」）</label>
+          <label>{{ t('pack.field.category') }}</label>
           <div class="pack-form-cats">
             <button
               v-for="c in CATEGORIES.slice(1)"
@@ -2596,16 +2574,16 @@ watch(
               {{ c.icon }} {{ c.name }}
             </button>
           </div>
-          <label>简介</label>
-          <input type="text" v-model="packFormDesc" placeholder="可选，一句话介绍" maxlength="1000" />
-          <label>README（Markdown，可选）</label>
+          <label>{{ t('pack.field.intro') }}</label>
+          <input type="text" v-model="packFormDesc" :placeholder="t('pack.intro_placeholder')" maxlength="1000" />
+          <label>{{ t('pack.field.readme') }}</label>
           <textarea
             v-model="packFormReadme"
             rows="5"
-            placeholder="支持 Markdown 语法，将展示在整合包详情页"
+            :placeholder="t('pack.readme_placeholder')"
             style="width:100%;background:#111215;border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-family:inherit;resize:vertical;margin-bottom:4px"
           ></textarea>
-          <label>成员插件（至少 1 个，下方从商店挑选或手动输入）</label>
+          <label>{{ t('pack.field.members') }}</label>
           <div class="pack-picker">
             <div class="pack-picker-cats">
               <button
@@ -2627,11 +2605,11 @@ watch(
               <input
                 type="search"
                 v-model="packPickerSearch"
-                placeholder="搜索商店插件…"
+                :placeholder="t('pack.member_search')"
                 @input="onPackPickerSearch()"
                 autocomplete="off"
               />
-              <span class="pack-picker-count">共 {{ packPickerTotal }} 个</span>
+              <span class="pack-picker-count">{{ t('store.count_suffix', { total: packPickerTotal }) }}</span>
             </div>
             <div class="pack-picker-list" v-if="!packPickerLoading">
               <label v-for="p in packPickerItems" :key="p.entry" class="pack-picker-item">
@@ -2648,12 +2626,12 @@ watch(
                   <span class="pack-picker-item-cat">{{ getCategory(p.category).icon }} {{ getCategory(p.category).name }}</span>
                 </span>
               </label>
-              <div v-if="packPickerItems.length === 0" class="pack-picker-empty">没有更多插件</div>
+              <div v-if="packPickerItems.length === 0" class="pack-picker-empty">{{ t('store.picker.no_more') }}</div>
             </div>
-            <div v-else class="pack-picker-empty">加载中…</div>
+            <div v-else class="pack-picker-empty">{{ t('common.loading') }}</div>
             <div class="pack-picker-pages">
               <button class="page-btn" :disabled="packPickerPage <= 1" @click="packPickerPrev()">‹</button>
-              <span style="font-size:0.8rem;color:var(--text-dim)">第 {{ packPickerPage }} 页</span>
+              <span style="font-size:0.8rem;color:var(--text-dim)">{{ t('common.page', { page: packPickerPage }) }}</span>
               <button
                 class="page-btn"
                 :disabled="packPickerPage * PACK_PICKER_LIMIT >= packPickerTotal"
@@ -2664,14 +2642,14 @@ watch(
               <input
                 type="text"
                 v-model="packMemberManualInput"
-                placeholder="或手动输入插件 entry，回车添加"
+                :placeholder="t('pack.member_manual')"
                 @keydown.enter.prevent="packAddManualMember()"
                 autocomplete="off"
               />
-              <button class="btn-sm" @click="packAddManualMember()">添加</button>
+              <button class="btn-sm" @click="packAddManualMember()">{{ t('pack.member_add') }}</button>
             </div>
             <div class="pack-selected" v-if="packMembers.length">
-              <span class="pack-selected-label">已选：</span>
+              <span class="pack-selected-label">{{ t('pack.selected_label') }}</span>
               <span v-for="m in packMembers" :key="m" class="pack-selected-tag">
                 {{ m }}
                 <button class="pack-selected-remove" @click="packRemoveMember(m)">×</button>
@@ -2680,9 +2658,9 @@ watch(
           </div>
         </div>
         <div class="modal-btns">
-          <button class="btn" @click="packCloseModal('packCreateModal')">取消</button>
+          <button class="btn" @click="packCloseModal('packCreateModal')">{{ t('common.cancel') }}</button>
           <button class="btn btn-primary" :disabled="packCreateSubmitting" @click="packCreateSubmit()">
-            {{ packCreateSubmitting ? (packEditEntry ? '保存中…' : '创建中…') : (packEditEntry ? '保存修改' : '发布整合包') }}
+            {{ packCreateSubmitting ? (packEditEntry ? t('pack.saving') : t('pack.creating')) : (packEditEntry ? t('pack.save_changes') : t('pack.publish')) }}
           </button>
         </div>
         <div class="modal-err">{{ packCreateErr }}</div>

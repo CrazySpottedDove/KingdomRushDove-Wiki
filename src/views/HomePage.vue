@@ -1,71 +1,72 @@
 <script setup lang="ts">
+import { t } from '../i18n'
 </script>
 
 <template>
   <div class="page-wrap" style="max-width:900px;margin:0 auto;padding:0 16px 60px;">
     <header>
-      <h1>王国保卫战 Dove 版</h1>
-      <p>KingdomRushDove · 社区服务器</p>
+      <h1>{{ t('site.title') }}</h1>
+      <p>{{ t('site.subtitle') }}</p>
     </header>
 
     <div class="notice">
-      如可访问 IPv6 网络，请优先使用
-      <a href="https://krdovedownload6.crazyspotteddove.top:52000">IPv6 官网</a>，IPv4 官网网速较慢。
+      {{ t('home.ipv6.before') }}
+      <a href="https://krdovedownload6.crazyspotteddove.top:52000">{{ t('home.ipv6.link') }}</a>{{ t('home.ipv6.after') }}
     </div>
 
-    <h2 class="sec">索引</h2>
+    <h2 class="sec">{{ t('home.index.title') }}</h2>
     <div class="nav-grid">
       <a class="nav-card" href="/_assets">
         <div class="icon">🎨</div>
-        <div class="label">美术资源</div>
+        <div class="label">{{ t('home.card.assets') }}</div>
       </a>
       <router-link class="nav-card" to="/history">
         <div class="icon">📋</div>
-        <div class="label">更新历史</div>
+        <div class="label">{{ t('home.card.history') }}</div>
       </router-link>
       <router-link class="nav-card" to="/plugins">
         <div class="icon">🧩</div>
-        <div class="label">插件商店</div>
+        <div class="label">{{ t('home.card.plugins') }}</div>
       </router-link>
       <router-link class="nav-card" to="/challenges">
         <div class="icon">🏁</div>
-        <div class="label">挑战</div>
+        <div class="label">{{ t('home.card.challenges') }}</div>
       </router-link>
       <router-link class="nav-card" to="/wiki/plugin_guide">
         <div class="icon">📖</div>
-        <div class="label">插件开发文档</div>
+        <div class="label">{{ t('home.card.plugin_guide') }}</div>
       </router-link>
       <router-link class="nav-card" to="/changelog">
         <div class="icon">📰</div>
-        <div class="label">改版介绍</div>
+        <div class="label">{{ t('home.card.changelog') }}</div>
       </router-link>
     </div>
 
-    <h2 class="sec">下载说明</h2>
+    <h2 class="sec">{{ t('home.download.title') }}</h2>
     <div class="download-notice">
-      <p>为减轻服务器网络带宽压力，提供更稳定的插件服务和更新服务，现已不支持通过服务器下载游戏本体。可尝试从 <a href="https://pan.quark.cn/s/f79b8c288102?pwd=V2Ec">夸克网盘链接</a>，或进入交流 QQ 群 698678477 获取资源。其余获取渠道均为非官方渠道，不保证时效性和安全性。</p>
+      <p>{{ t('home.download.before') }} <a href="https://pan.quark.cn/s/f79b8c288102?pwd=V2Ec">{{ t('home.download.link') }}</a>{{ t('home.download.after') }}</p>
     </div>
 
-    <h2 class="sec">赞赏</h2>
+    <h2 class="sec">{{ t('home.donate.title') }}</h2>
     <div class="donate-wrap">
-      <p>如果你觉得做得不错，请作者喝杯牢大茶吧，这是对我很好的鼓励！</p>
-      <img :src="'/assets/donate.jpg'" alt="微信赞赏码" />
+      <p>{{ t('home.donate.body') }}</p>
+      <img :src="'/assets/donate.jpg'" :alt="t('home.donate.alt')" />
     </div>
 
-    <h2 class="sec">问题自查</h2>
-    <h3>显卡驱动问题</h3>
+    <h2 class="sec">{{ t('home.faq.title') }}</h2>
+    <h3>{{ t('home.faq.gpu.title') }}</h3>
     <ul>
-      <li>问题表现：Windows 端双击启动器，短暂跳出小黑框后程序结束。</li>
-      <li>可能原因：电脑恰好使用 AMD 集成显卡，且使用了过于老旧的 AMD 显卡驱动，对部分 OpenGL 的 API 支持有 bug。</li>
-      <li>已知案例：版本 31.0.12016.9 的 AMD VGA Driver 集成显卡驱动。</li>
-      <li>修复方式：更新显卡驱动。</li>
+      <li>{{ t('home.faq.gpu.symptom') }}</li>
+      <li>{{ t('home.faq.gpu.reason') }}</li>
+      <li>{{ t('home.faq.gpu.case') }}</li>
+      <li>{{ t('home.faq.gpu.fix') }}</li>
     </ul>
 
-    <h2 class="sec">群聊</h2>
+    <h2 class="sec">{{ t('home.group.title') }}</h2>
     <ul class="qq-list">
-      <li>交流 QQ 群（死鱼定期清理）：698678477。</li>
-      <li>毁灭者是王国保卫战1代的第一个boss，头上长了2个角。</li>
-      <li>如对插件开发有兴趣，可加入 QQ 群 <strong>1025619048</strong>。</li>
+      <li>{{ t('home.group.1') }}</li>
+      <li>{{ t('home.group.2') }}</li>
+      <li>{{ t('home.group.3.before') }} <strong>1025619048</strong>{{ t('home.group.3.after') }}</li>
     </ul>
   </div>
 </template>

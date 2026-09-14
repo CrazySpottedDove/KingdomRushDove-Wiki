@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import WikiSidebar from '../components/WikiSidebar.vue'
+import { t } from '../i18n'
 
 marked.setOptions({ gfm: true, breaks: false })
 
@@ -167,11 +168,11 @@ watch(() => route.path, fetchPage, { immediate: true })
   <div class="wiki-layout">
     <WikiSidebar />
     <main class="wiki-content">
-      <div v-if="loading" class="loading">加载中…</div>
+      <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
       <div v-else-if="notFound" class="not-found">
-        <h2>📄 页面未找到</h2>
-        <p>Wiki 中不存在此页面。</p>
-        <router-link to="/wiki" class="btn btn-primary" style="margin-top:16px;display:inline-block">← 返回 Wiki 首页</router-link>
+        <h2>📄 {{ t('wiki.not_found_title') }}</h2>
+        <p>{{ t('wiki.not_found_body') }}</p>
+        <router-link to="/wiki" class="btn btn-primary" style="margin-top:16px;display:inline-block">← {{ t('wiki.back_home') }}</router-link>
       </div>
       <div v-else-if="error" class="error">{{ error }}</div>
       <div v-else class="md-body" v-html="content"></div>

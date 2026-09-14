@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { t } from '../i18n'
 
 const content = ref('')
 const loading = ref(true)
@@ -42,12 +43,12 @@ onMounted(async () => {
 <template>
   <div class="page-wrap" style="max-width:860px;margin:0 auto;padding:0 16px 60px;">
     <header>
-      <h1>改版介绍</h1>
-      <p>KingdomRushDove · 版本说明与特性一览</p>
+      <h1>{{ t('home.card.changelog') }}</h1>
+      <p>{{ t('changelog.subtitle') }}</p>
     </header>
     <div class="md-body">
-      <div v-if="loading" class="loading">加载中…</div>
-      <div v-else-if="error" class="error">⚠️ 加载失败：{{ error }}</div>
+      <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
+      <div v-else-if="error" class="error">{{ t('changelog.load_failed', { error }) }}</div>
       <div v-else v-html="content"></div>
     </div>
   </div>

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import PluginCommentsModal from '../components/PluginCommentsModal.vue'
 import { escHtml, mdToHtml } from '../utils/markdown'
+import { t } from '../i18n'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -24,19 +25,20 @@ interface DevData {
   plugins?: any[]
 }
 
+// name 用 getter，模板读取时按当前语言实时取文案
 const CATEGORIES = [
-  { slug: '', icon: '🔍', name: '全部' },
-  { slug: 'gameplay', icon: '🎮', name: '玩法' },
-  { slug: 'cosmetic', icon: '🎨', name: '美化' },
-  { slug: 'display', icon: '🖥️', name: '显示' },
-  { slug: 'tower', icon: '🏰', name: '防御塔' },
-  { slug: 'hero', icon: '🦸', name: '英雄' },
-  { slug: 'enemy', icon: '👾', name: '敌人' },
-  { slug: 'level', icon: '🗺️', name: '关卡' },
-  { slug: 'other', icon: '📦', name: '其他' },
+  { slug: '', icon: '🔍', get name() { return t('category.all') } },
+  { slug: 'gameplay', icon: '🎮', get name() { return t('category.gameplay') } },
+  { slug: 'cosmetic', icon: '🎨', get name() { return t('category.cosmetic') } },
+  { slug: 'display', icon: '🖥️', get name() { return t('category.display') } },
+  { slug: 'tower', icon: '🏰', get name() { return t('category.tower') } },
+  { slug: 'hero', icon: '🦸', get name() { return t('category.hero') } },
+  { slug: 'enemy', icon: '👾', get name() { return t('category.enemy') } },
+  { slug: 'level', icon: '🗺️', get name() { return t('category.level') } },
+  { slug: 'other', icon: '📦', get name() { return t('category.other') } },
 ]
 const LEVEL_THRESHOLDS = [0, 500, 2000, 10000, 50000]
-const LEVEL_NAMES = ['🌱 新手', '⭐ 开发者', '🔥 资深开发者', '💎 精英开发者', '👑 传奇开发者']
+const LEVEL_NAMES = computed(() => [t('dev.level.1'), t('dev.level.2'), t('dev.level.3'), t('dev.level.4'), t('dev.level.5')])
 
 const targetUser = computed(() => route.params.username as string)
 const devData = ref<DevData | null>(null)
@@ -93,7 +95,7 @@ const socialLinksEntries = computed<[string, string][]>(() => {
 })
 
 function renderBio(md: string | undefined) {
-  if (!md || !md.trim()) return '这位开发者还没有填写介绍。'
+  if (!md || !md.trim()) return t('dev.no_bio')
   return mdToHtml(md)
 }
 
@@ -110,7 +112,7 @@ function cancelBioEdit() {
 
 async function saveBio() {
   if (!auth.userAuth || !targetUser.value) return
-  bioStatus.value = '保存中…'
+  bioStatus.value = t('dev.saving')
   try {
     const resp = await fetch(`/plugins/developer/${encodeURIComponent(targetUser.value)}/bio`, {
       method: 'PUT',
@@ -124,7 +126,7 @@ async function saveBio() {
       bioStatus.value = '❌ ' + (await resp.text())
     }
   } catch (e: any) {
-    bioStatus.value = '❌ 网络错误：' + e.message
+    bioStatus.value = t('common.network_error_detail', { error: e.message })
   }
 }
 
@@ -160,7 +162,7 @@ function deselectAllPlugins() {
 const selectionCount = computed(() => selectedPlugins.value.size)
 
 async function batchChangeCover() {
-  if (selectedPlugins.value.size === 0) { alert('请先选择要修改封面的插件'); return }
+  if (selectedPlugins.value.size === 0) { alert(t('dev.select_for_cover')); return }
   for (const entry of selectedPlugins.value) {
     await changeCoverForEntry(entry)
   }
@@ -175,7 +177,7 @@ function changeCoverForEntry(entry: string): Promise<void> {
       const file = input.files?.[0]
       if (!file) { resolve(); return }
       if (file.size > 2 * 1024 * 1024) {
-        alert(`[${entry}] 封面图不能超过 2MB`)
+        alert(t('dev.cover_too_large', { entry }))
         resolve(); return
       }
       const resp = await fetch(`/plugins/${encodeURIComponent(entry)}/cover`, {
@@ -189,7 +191,7 @@ function changeCoverForEntry(entry: string): Promise<void> {
           coverEl.innerHTML = `<img src="/plugins/${encodeURIComponent(entry)}/cover?size=thumb&t=${Date.now()}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`
         }
       } else {
-        alert(`[${entry}] 封面上传失败：${await resp.text()}`)
+        alert(t('dev.cover_upload_failed', { entry, error: await resp.text() }))
       }
       resolve()
     }
@@ -198,8 +200,8 @@ function changeCoverForEntry(entry: string): Promise<void> {
 }
 
 async function batchDelete() {
-  if (selectedPlugins.value.size === 0) { alert('请先选择要删除的插件'); return }
-  if (!confirm(`确定要删除选中的 ${selectedPlugins.value.size} 个插件吗？此操作不可恢复！`)) return
+  if (selectedPlugins.value.size === 0) { alert(t('dev.select_for_delete')); return }
+  if (!confirm(t('dev.delete_selected_confirm', { count: selectedPlugins.value.size }))) return
   const entries = Array.from(selectedPlugins.value)
   let success = 0, failed = 0
   for (const entry of entries) {
@@ -218,7 +220,7 @@ async function batchDelete() {
       }
     } catch { failed++ }
   }
-  alert(`删除完成：成功 ${success} 个，失败 ${failed} 个`)
+  alert(t('dev.delete_done', { success, failed }))
   if (success > 0) await loadProfile()
 }
 
@@ -293,7 +295,7 @@ async function toggleLike(event: Event, entry: string) {
 async function showPluginDetail(entry: string, plugin: any) {
   detailEntry.value = entry
   detailPlugin.value = plugin
-  detailContent.value = '<div style="text-align:center;padding:20px;color:#666">加载中…</div>'
+  detailContent.value = '<div style="text-align:center;padding:20px;color:#666">' + t('common.loading') + '</div>'
   showDetail.value = true
   try {
     const resp = await fetch('/plugins/' + encodeURIComponent(entry) + '/readme')
@@ -301,17 +303,17 @@ async function showPluginDetail(entry: string, plugin: any) {
       const text = await resp.text()
       detailContent.value = mdToHtml(text)
     } else {
-      detailContent.value = `<p style="color:var(--text-dim);text-align:center">${escHtml(plugin.desc || '作者暂未提供详细介绍。')}</p>`
+      detailContent.value = `<p style="color:var(--text-dim);text-align:center">${escHtml(plugin.desc || t('dev.no_plugin_desc'))}</p>`
     }
   } catch (e: any) {
-    detailContent.value = '加载失败：' + e.message
+    detailContent.value = t('dev.load_failed_detail', { error: e.message })
   }
 }
 
 function closeDetail() { showDetail.value = false }
 
 async function doLogin() {
-  if (!loginUser.value || !loginPass.value) { loginErr.value = '请填写用户名和密码'; return }
+  if (!loginUser.value || !loginPass.value) { loginErr.value = t('common.need_credentials'); return }
   try {
     const resp = await fetch('/plugins/login', {
       method: 'POST',
@@ -325,7 +327,7 @@ async function doLogin() {
     showLogin.value = false
     loginErr.value = ''
     await loadProfile()
-  } catch (e: any) { loginErr.value = '网络错误：' + e.message }
+  } catch (e: any) { loginErr.value = t('common.network_error_detail_plain', { error: e.message }) }
 }
 
 function closeLoginModal() { showLogin.value = false; loginErr.value = '' }
@@ -384,17 +386,17 @@ onMounted(async () => {
   </div>
 
   <div class="page-wrap" style="max-width:clamp(900px,94vw,1400px);margin:0 auto;padding:0 16px 60px;">
-    <div v-if="loading" style="text-align:center;padding:60px;color:var(--text-dim)">⏳ 加载中…</div>
+    <div v-if="loading" style="text-align:center;padding:60px;color:var(--text-dim)">⏳ {{ t('common.loading') }}</div>
 
     <div v-else-if="notFound" class="not-found">
-      <h2>👤 找不到开发者</h2>
-      <p>该用户不存在或尚未注册。</p>
-      <router-link to="/plugins" class="btn btn-primary" style="margin-top:16px;display:inline-block">← 返回插件商店</router-link>
+      <h2>👤 {{ t('dev.not_found') }}</h2>
+      <p>{{ t('dev.not_found_body') }}</p>
+      <router-link to="/plugins" class="btn btn-primary" style="margin-top:16px;display:inline-block">← {{ t('dev.back_to_store') }}</router-link>
     </div>
 
     <div v-else-if="devData" id="profileContent">
       <div class="banner-edit-inline" id="bannerEditInline" v-show="isOwnProfile">
-        <button class="btn" @click="editBanner">📷 更换背景图</button>
+        <button class="btn" @click="editBanner">📷 {{ t('dev.change_banner') }}</button>
       </div>
 
       <div class="profile-header">
@@ -405,12 +407,12 @@ onMounted(async () => {
           <template v-else>
             <div class="profile-avatar-placeholder">{{ ['🌱','⭐','🔥','💎','👑'][devData.level - 1] || '👤' }}</div>
           </template>
-          <div v-if="isOwnProfile" class="avatar-edit-overlay">📷 换头像</div>
+          <div v-if="isOwnProfile" class="avatar-edit-overlay">📷 {{ t('dev.change_avatar') }}</div>
         </div>
         <div class="profile-info">
           <div class="profile-display-name" id="profileDisplayName">
             {{ devData.display_name || devData.username }}
-            <button v-show="isOwnProfile" class="btn edit-profile-btn" id="editProfileBtn">编辑</button>
+            <button v-show="isOwnProfile" class="btn edit-profile-btn" id="editProfileBtn">{{ t('common.edit') }}</button>
           </div>
           <div class="profile-username" v-if="devData.display_name && devData.display_name !== devData.username">@{{ devData.username }}</div>
           <div style="display:none">
@@ -418,36 +420,36 @@ onMounted(async () => {
             <span :class="['level-badge', 'level-' + devData.level]">{{ devData.level_name }}</span>
           </div>
           <div class="profile-stats" id="profileStats">
-            <div class="stat-item"><strong>{{ devData.plugin_count || 0 }}</strong>插件</div>
-            <div class="stat-item"><strong>{{ devData.total_downloads || 0 }}</strong>总下载</div>
-            <div class="stat-item"><strong>{{ devData.total_likes || 0 }}</strong>总点赞</div>
-            <div class="stat-item"><strong>{{ devData.score || 0 }}</strong>积分</div>
+            <div class="stat-item"><strong>{{ devData.plugin_count || 0 }}</strong>{{ t('dev.stat.plugins') }}</div>
+            <div class="stat-item"><strong>{{ devData.total_downloads || 0 }}</strong>{{ t('dev.stat.downloads') }}</div>
+            <div class="stat-item"><strong>{{ devData.total_likes || 0 }}</strong>{{ t('dev.stat.likes') }}</div>
+            <div class="stat-item"><strong>{{ devData.score || 0 }}</strong>{{ t('dev.stat.score') }}</div>
           </div>
           <div class="social-links" id="socialLinks">
             <template v-if="socialLinksEntries.length">
               <a v-for="[key, url] in socialLinksEntries" :key="key" :href="url" class="social-link" target="_blank" rel="noopener">
-                {{ key === 'github' ? '🐙 GitHub' : key === 'twitter' ? '🐦 Twitter' : key === 'website' ? '🌐 网站' : key === 'email' ? '📧 邮箱' : key }}
+                {{ key === 'github' ? '🐙 GitHub' : key === 'twitter' ? '🐦 Twitter' : key === 'website' ? t('dev.link.website') : key === 'email' ? t('dev.link.email') : key }}
               </a>
             </template>
           </div>
         </div>
         <div class="profile-actions">
           <button class="btn btn-user" id="pageUserBtn" @click="auth.userAuth ? auth.clearUserAuth() : (showLogin = true)">
-            {{ auth.userAuth ? `👤 ${auth.userAuth.username} (退出)` : '👤 登录' }}
+            {{ auth.userAuth ? t('dev.login.logged_in', { name: auth.userAuth.username }) : t('dev.login.login') }}
           </button>
           <button v-if="auth.userAuth && !isOwnProfile"
             :class="['btn', 'btn-follow-dev', { following: auth.myFollowedDevs.has(targetUser!) }]"
             @click="toggleFollowDeveloper">
-            {{ auth.myFollowedDevs.has(targetUser!) ? '✓ 已关注' : '👤+ 关注开发者' }}
+            {{ auth.myFollowedDevs.has(targetUser!) ? t('dev.following') : t('dev.follow') }}
           </button>
         </div>
       </div>
 
       <div class="score-section">
         <div class="score-label">
-          <span>等级积分: <strong style="color:var(--text)">{{ devData.score || 0 }}</strong></span>
-          <span v-if="LEVEL_THRESHOLDS[(devData.level || 1) - 1 + 1]">下一级: {{ LEVEL_NAMES[(devData.level || 1) - 1 + 1] }} ({{ LEVEL_THRESHOLDS[(devData.level || 1) - 1 + 1] }} 分)</span>
-          <span v-else>最高等级 🏆</span>
+          <span>{{ t('dev.level_score') }}: <strong style="color:var(--text)">{{ devData.score || 0 }}</strong></span>
+          <span v-if="LEVEL_THRESHOLDS[(devData.level || 1) - 1 + 1]">{{ t('dev.next_level', { name: LEVEL_NAMES[(devData.level || 1) - 1 + 1], score: LEVEL_THRESHOLDS[(devData.level || 1) - 1 + 1] }) }}</span>
+          <span v-else>{{ t('dev.max_level') }}</span>
         </div>
         <div class="score-bar">
           <div class="score-fill" :style="{ width: Math.min(100, devData.level ? Math.round(((devData.score || 0) - (LEVEL_THRESHOLDS[devData.level - 1] || 0)) / ((LEVEL_THRESHOLDS[devData.level] || 0) - (LEVEL_THRESHOLDS[devData.level - 1] || 0)) * 100) : 100) + '%' }"></div>
@@ -460,42 +462,42 @@ onMounted(async () => {
 
       <div class="bio-section">
         <div class="section-title">
-          📝 关于我
-          <button v-show="isOwnProfile" class="btn" style="padding:3px 10px;font-size:0.8rem" @click="toggleBioEdit">编辑</button>
+          📝 {{ t('dev.about') }}
+          <button v-show="isOwnProfile" class="btn" style="padding:3px 10px;font-size:0.8rem" @click="toggleBioEdit">{{ t('common.edit') }}</button>
         </div>
-        <div v-if="!editingBio" class="bio-content" :class="{ empty: !devData.bio_md || !devData.bio_md.trim() }" v-html="devData.bio_md && devData.bio_md.trim() ? mdToHtml(devData.bio_md) : '这位开发者还没有填写介绍。'"></div>
+        <div v-if="!editingBio" class="bio-content" :class="{ empty: !devData.bio_md || !devData.bio_md.trim() }" v-html="devData.bio_md && devData.bio_md.trim() ? mdToHtml(devData.bio_md) : t('dev.no_bio')"></div>
         <div v-else class="bio-editor" style="display:block">
-          <textarea id="bioTextarea" v-model="bioText" placeholder="用 Markdown 写一些关于你自己的介绍…" style="width:100%;box-sizing:border-box;min-height:140px;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:10px 12px;font-family:inherit;font-size:0.88rem;outline:none;line-height:1.65"></textarea>
-          <p class="bio-editor-hint">支持 Markdown 格式，最多 10000 字符</p>
+          <textarea id="bioTextarea" v-model="bioText" :placeholder="t('dev.bio_placeholder')" style="width:100%;box-sizing:border-box;min-height:140px;resize:vertical;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:10px 12px;font-family:inherit;font-size:0.88rem;outline:none;line-height:1.65"></textarea>
+          <p class="bio-editor-hint">{{ t('dev.bio_hint') }}</p>
           <div class="bio-actions">
             <span id="bioStatus" style="font-size:0.8rem;flex:1">{{ bioStatus }}</span>
-            <button class="btn" @click="cancelBioEdit">取消</button>
-            <button class="btn btn-primary" @click="saveBio">保存</button>
+            <button class="btn" @click="cancelBioEdit">{{ t('common.cancel') }}</button>
+            <button class="btn btn-primary" @click="saveBio">{{ t('common.save') }}</button>
           </div>
         </div>
       </div>
 
       <div>
         <div class="section-title">
-          🧩 他/她的插件
+          🧩 {{ t('dev.plugins_title') }}
           <span style="font-size:0.82rem;color:var(--text-dim);font-weight:400">({{ devData.plugins?.length || 0 }})</span>
-          <button v-show="isOwnProfile" class="btn" style="padding:3px 10px;font-size:0.8rem;margin-left:12px" @click="toggleManageMode">{{ manageMode ? '退出管理' : '管理插件' }}</button>
+          <button v-show="isOwnProfile" class="btn" style="padding:3px 10px;font-size:0.8rem;margin-left:12px" @click="toggleManageMode">{{ manageMode ? t('dev.exit_manage') : t('dev.manage_plugins') }}</button>
         </div>
 
         <div v-if="manageMode" id="manageToolbar" style="background:#1a1b20;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <button class="btn-sm" style="border-color:#4a9eff" @click="selectAllPlugins">全选</button>
-            <button class="btn-sm" style="border-color:#666" @click="deselectAllPlugins">取消</button>
-            <span style="color:var(--text-dim);margin:0 8px">已选择: {{ selectionCount }}</span>
+            <button class="btn-sm" style="border-color:#4a9eff" @click="selectAllPlugins">{{ t('common.select_all') }}</button>
+            <button class="btn-sm" style="border-color:#666" @click="deselectAllPlugins">{{ t('dev.deselect') }}</button>
+            <span style="color:var(--text-dim);margin:0 8px">{{ t('dev.selected_count', { count: selectionCount }) }}</span>
             <div style="flex:1"></div>
-            <button class="btn-sm" style="border-color:#ffa94d;color:#ffa94d" :disabled="selectionCount === 0" @click="batchChangeCover">📷 批量修改封面</button>
-            <button class="btn-sm btn-danger-sm" :disabled="selectionCount === 0" @click="batchDelete">🗑 删除选中</button>
-            <button class="btn-sm" style="border-color:#51cf66;color:#51cf66" @click="toggleManageMode">退出管理</button>
+            <button class="btn-sm" style="border-color:#ffa94d;color:#ffa94d" :disabled="selectionCount === 0" @click="batchChangeCover">📷 {{ t('dev.batch_cover') }}</button>
+            <button class="btn-sm btn-danger-sm" :disabled="selectionCount === 0" @click="batchDelete">🗑 {{ t('dev.delete_selected') }}</button>
+            <button class="btn-sm" style="border-color:#51cf66;color:#51cf66" @click="toggleManageMode">{{ t('dev.exit_manage') }}</button>
           </div>
         </div>
 
         <div class="plugin-grid">
-          <div v-if="!devData.plugins?.length" class="grid-empty">暂无插件</div>
+          <div v-if="!devData.plugins?.length" class="grid-empty">{{ t('dev.no_plugins') }}</div>
           <div v-for="p in devData.plugins" :key="p.entry" class="plugin-card" :data-entry="p.entry" @click="handleCardClick($event, p.entry)" :class="{ 'manage-mode': manageMode, 'selected': selectedPlugins.has(p.entry) }">
             <div class="plugin-card-checkbox">✓</div>
             <template v-if="p.has_cover">
@@ -506,13 +508,13 @@ onMounted(async () => {
             </template>
             <div class="card-body">
               <div class="card-meta-row">
-                <span :class="['card-category', 'cat-' + (p.category || 'other')]">{{ CATEGORIES.find(c => c.slug === p.category)?.icon || '📦' }} {{ CATEGORIES.find(c => c.slug === p.category)?.name || '其他' }}</span>
+                <span :class="['card-category', 'cat-' + (p.category || 'other')]">{{ CATEGORIES.find(c => c.slug === p.category)?.icon || '📦' }} {{ CATEGORIES.find(c => c.slug === p.category)?.name || t('category.other') }}</span>
                 <div style="display:flex;gap:4px">
                   <button :class="['btn-like', { favorited: auth.myFollows.has(p.entry) }]" data-kind="favorite"
-                    @click="toggleFavorite($event, p.entry)" :title="auth.myFollows.has(p.entry) ? '取消收藏' : '收藏插件'"
+                    @click="toggleFavorite($event, p.entry)" :title="auth.myFollows.has(p.entry) ? t('dev.unfavorite') : t('dev.favorite')"
                     style="min-width:28px">{{ auth.myFollows.has(p.entry) ? '⭐' : '☆' }}</button>
                   <button :class="['btn-like', { liked: auth.myLikes.has(p.entry) }]" data-kind="like"
-                    @click="toggleLike($event, p.entry)" :title="auth.myLikes.has(p.entry) ? '取消点赞' : '点赞'">
+                    @click="toggleLike($event, p.entry)" :title="auth.myLikes.has(p.entry) ? t('dev.unlike') : t('dev.like')">
                     {{ auth.myLikes.has(p.entry) ? '❤' : '🤍' }}<span :id="'likes-' + escHtml(p.entry)">{{ p.like_count || 0 }}</span>
                   </button>
                 </div>
@@ -529,9 +531,9 @@ onMounted(async () => {
                 <span>📅 {{ fmtDate(p.published_at) }}</span>
               </div>
               <div class="card-actions">
-                <button class="btn-sm btn-detail-sm" @click="showPluginDetail(p.entry, p)">📄 详情</button>
-                <a class="btn-sm btn-download-sm" :href="'/plugins/download/' + encodeURIComponent(p.filename)">⬇ 下载</a>
-                <button class="btn-sm" style="border-color:#2d4a6a;color:#74c0fc;background:#12243a" @click="showPluginComments(p.entry, p)">💬 评论</button>
+                <button class="btn-sm btn-detail-sm" @click="showPluginDetail(p.entry, p)">📄 {{ t('dev.detail') }}</button>
+                <a class="btn-sm btn-download-sm" :href="'/plugins/download/' + encodeURIComponent(p.filename)">⬇ {{ t('common.download') }}</a>
+                <button class="btn-sm" style="border-color:#2d4a6a;color:#74c0fc;background:#12243a" @click="showPluginComments(p.entry, p)">💬 {{ t('common.comments') }}</button>
               </div>
             </div>
           </div>
@@ -544,15 +546,15 @@ onMounted(async () => {
       <div class="modal-backdrop" :class="{ show: showDetail }" @click.self="closeDetail">
         <div class="modal">
           <div class="modal-header">
-            <h3>{{ detailPlugin?.name || '插件详情' }}</h3>
+            <h3>{{ detailPlugin?.name || t('dev.plugin_detail') }}</h3>
             <button class="modal-close" @click="closeDetail">×</button>
           </div>
           <div v-if="detailPlugin" class="readme-plugin-info">
-            <div><span>版本</span><br><strong>{{ detailPlugin.version }}</strong></div>
-            <div><span>分类</span><br><strong>{{ CATEGORIES.find(c => c.slug === detailPlugin.category)?.icon }} {{ CATEGORIES.find(c => c.slug === detailPlugin.category)?.name }}</strong></div>
-            <div><span>下载量</span><br><strong>{{ detailPlugin.downloads }}</strong></div>
-            <div><span>点赞数</span><br><strong>{{ detailPlugin.like_count || 0 }}</strong></div>
-            <div><span>发布日期</span><br><strong>{{ fmtDate(detailPlugin.published_at) }}</strong></div>
+            <div><span>{{ t('dev.field.version') }}</span><br><strong>{{ detailPlugin.version }}</strong></div>
+            <div><span>{{ t('dev.field.category') }}</span><br><strong>{{ CATEGORIES.find(c => c.slug === detailPlugin.category)?.icon }} {{ CATEGORIES.find(c => c.slug === detailPlugin.category)?.name }}</strong></div>
+            <div><span>{{ t('dev.field.downloads') }}</span><br><strong>{{ detailPlugin.downloads }}</strong></div>
+            <div><span>{{ t('dev.field.likes') }}</span><br><strong>{{ detailPlugin.like_count || 0 }}</strong></div>
+            <div><span>{{ t('dev.field.published') }}</span><br><strong>{{ fmtDate(detailPlugin.published_at) }}</strong></div>
           </div>
           <div class="modal-body" v-html="detailContent"></div>
         </div>
@@ -574,16 +576,16 @@ onMounted(async () => {
       <div class="modal-backdrop" :class="{ show: showLogin }" @click.self="closeLoginModal" style="max-width:100%">
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;max-width:400px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.6)">
           <div class="modal-header">
-            <h3>👤 登录账户</h3>
+            <h3>👤 {{ t('dev.login.title') }}</h3>
             <button class="modal-close" @click="closeLoginModal">×</button>
           </div>
-          <label style="font-size:.82rem;color:var(--text-dim);display:block;margin-bottom:4px">用户名</label>
-          <input type="text" v-model="loginUser" placeholder="用户名" autocomplete="username" style="margin-bottom:12px;width:100%" @keydown.enter="doLogin" />
-          <label style="font-size:.82rem;color:var(--text-dim);display:block;margin-bottom:4px">密码</label>
-          <input type="password" v-model="loginPass" placeholder="密码" autocomplete="current-password" style="margin-bottom:4px;width:100%" @keydown.enter="doLogin" />
+          <label style="font-size:.82rem;color:var(--text-dim);display:block;margin-bottom:4px">{{ t('common.username') }}</label>
+          <input type="text" v-model="loginUser" :placeholder="t('common.username')" autocomplete="username" style="margin-bottom:12px;width:100%" @keydown.enter="doLogin" />
+          <label style="font-size:.82rem;color:var(--text-dim);display:block;margin-bottom:4px">{{ t('common.password') }}</label>
+          <input type="password" v-model="loginPass" :placeholder="t('common.password')" autocomplete="current-password" style="margin-bottom:4px;width:100%" @keydown.enter="doLogin" />
           <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
-            <button class="btn" @click="closeLoginModal">取消</button>
-            <button class="btn btn-primary" @click="doLogin">登录</button>
+            <button class="btn" @click="closeLoginModal">{{ t('common.cancel') }}</button>
+            <button class="btn btn-primary" @click="doLogin">{{ t('common.login') }}</button>
           </div>
           <div style="color:var(--danger);font-size:.82rem;margin-top:8px;min-height:18px">{{ loginErr }}</div>
         </div>

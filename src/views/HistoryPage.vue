@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { escHtml } from '../utils/markdown'
+import { t } from '../i18n'
 
 interface Commit {
   hash: string
@@ -59,12 +60,12 @@ onMounted(load)
 <template>
   <div class="page-wrap">
     <header>
-      <h1>更新历史</h1>
-      <p>master 分支提交记录</p>
+      <h1>{{ t('nav.history') }}</h1>
+      <p>{{ t('history.subtitle') }}</p>
     </header>
 
     <div id="list">
-      <div v-if="loading" class="loading">加载中…</div>
+      <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
       <div v-for="c in list" :key="c.hash" class="commit">
         <div class="commit-msg">{{ escHtml(c.message) }}</div>
         <div class="commit-meta">
@@ -76,19 +77,19 @@ onMounted(load)
     </div>
 
     <div class="pagination">
-      <button class="btn" :disabled="page <= 1" @click="goTo(page - 1)">‹ 上一页</button>
+      <button class="btn" :disabled="page <= 1" @click="goTo(page - 1)">‹ {{ t('common.prev') }}</button>
       <div id="page-nums">
         <template v-for="p in pageButtons" :key="p">
           <span v-if="p === '...'" style="color:var(--text-dim);padding:0 4px;line-height:2">…</span>
           <button v-else :class="['btn', { active: p === page }]" @click="goTo(p as number)">{{ p }}</button>
         </template>
       </div>
-      <button class="btn" :disabled="!hasMore" @click="goTo(page + 1)">下一页 ›</button>
+      <button class="btn" :disabled="!hasMore" @click="goTo(page + 1)">{{ t('common.next') }} ›</button>
       <div class="jump-wrap">
-        <label for="jump-input">跳转到</label>
+        <label for="jump-input">{{ t('common.jump_to') }}</label>
         <input class="jump-input" id="jump-input" type="number" min="1" :value="page" @input="goTo(parseInt(($event.target as HTMLInputElement).value) || 1)" />
       </div>
-      <span class="page-info">{{ hasMore ? `第 ${page} 页` : `第 ${page} 页（最后一页）` }}</span>
+      <span class="page-info">{{ hasMore ? t('common.page', { page }) : t('common.page_last', { page }) }}</span>
     </div>
   </div>
 </template>

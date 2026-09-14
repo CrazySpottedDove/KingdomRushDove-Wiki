@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import SidebarNode from './SidebarNode.vue'
 import type { WikiEntry } from './SidebarNode.vue'
+import { t } from '../i18n'
 
 const route = useRoute()
 const entries = ref<WikiEntry[]>([])
@@ -40,7 +41,7 @@ onMounted(async () => {
 <template>
   <nav class="wiki-sidebar">
     <router-link to="/wiki" class="sidebar-home" :class="{ active: route.path === '/wiki' }">
-      🏠 Wiki 首页
+      🏠 {{ t('wiki.home') }}
     </router-link>
     <SidebarNode
       v-for="e in entries"

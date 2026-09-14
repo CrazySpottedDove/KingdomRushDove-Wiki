@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
 import { useAuthStore } from './auth'
+import { t } from '../i18n'
 
 export interface Plugin {
   entry: string
@@ -28,15 +29,16 @@ export const usePluginStore = defineStore('pluginStore', () => {
 
   const FEATURE_COLLECTIONS_UI = false
   const CATEGORIES = [
-    { slug: '', icon: '🔍', name: '全部' },
-    { slug: 'gameplay', icon: '🎮', name: '玩法' },
-    { slug: 'cosmetic', icon: '🎨', name: '美化' },
-    { slug: 'display', icon: '🖥️', name: '显示' },
-    { slug: 'tower', icon: '🏰', name: '防御塔' },
-    { slug: 'hero', icon: '🦸', name: '英雄' },
-    { slug: 'enemy', icon: '👾', name: '敌人' },
-    { slug: 'level', icon: '🗺️', name: '关卡' },
-    { slug: 'other', icon: '📦', name: '其他' },
+    // name 用 getter：读取时按当前语言实时取文案，模板/拼接 HTML 都能自动跟随切换
+    { slug: '', icon: '🔍', get name() { return t('category.all') } },
+    { slug: 'gameplay', icon: '🎮', get name() { return t('category.gameplay') } },
+    { slug: 'cosmetic', icon: '🎨', get name() { return t('category.cosmetic') } },
+    { slug: 'display', icon: '🖥️', get name() { return t('category.display') } },
+    { slug: 'tower', icon: '🏰', get name() { return t('category.tower') } },
+    { slug: 'hero', icon: '🦸', get name() { return t('category.hero') } },
+    { slug: 'enemy', icon: '👾', get name() { return t('category.enemy') } },
+    { slug: 'level', icon: '🗺️', get name() { return t('category.level') } },
+    { slug: 'other', icon: '📦', get name() { return t('category.other') } },
   ]
   const PAGE_SIZE = 15
 

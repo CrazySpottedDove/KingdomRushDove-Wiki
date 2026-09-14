@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import WikiSidebar from '../components/WikiSidebar.vue'
-import { t } from '../i18n'
+import { t, useI18n } from '../i18n'
 
 marked.setOptions({ gfm: true, breaks: false })
 
@@ -106,10 +106,14 @@ function escapedCode(code: string): string {
 }
 
 const route = useRoute()
+const { locale } = useI18n()
 const content = ref('')
 const loading = ref(true)
 const notFound = ref(false)
 const error = ref('')
+
+// 英文内容位于 wiki/en/ 下（见 src/wiki_services.rs），图片等静态资源与中文树共用
+const langPrefix = computed(() => (locale.value === 'en' ? 'en/' : ''))
 
 // Base path for relative images: same directory as the markdown file
 // e.g. /wiki/heroes/gerald → /static/wiki/heroes/
@@ -130,7 +134,8 @@ async function fetchPage() {
   notFound.value = false
   error.value = ''
 
-  const candidates = resolveMdPath()
+  // 英文树缺页时回退到中文原文，避免出现 404（en 优先）
+  const candidates = resolveMdPath().flatMap((c) => (langPrefix.value ? [`${langPrefix.value}${c}`, c] : [c]))
   for (const candidate of candidates) {
     try {
       const resp = await fetch(`/static/wiki/${candidate}`)
@@ -161,7 +166,7 @@ function resolveMdPath(): string[] {
   ]
 }
 
-watch(() => route.path, fetchPage, { immediate: true })
+watch([() => route.path, locale], fetchPage, { immediate: true })
 </script>
 
 <template>

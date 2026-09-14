@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import SidebarNode from './SidebarNode.vue'
 import type { WikiEntry } from './SidebarNode.vue'
-import { t } from '../i18n'
+import { t, useI18n } from '../i18n'
 
 const route = useRoute()
+const { locale } = useI18n()
 const entries = ref<WikiEntry[]>([])
 const expanded = ref<Set<string>>(new Set())
 
@@ -18,9 +19,9 @@ function toggle(name: string) {
   else expanded.value.add(name)
 }
 
-onMounted(async () => {
+async function loadSidebar() {
   try {
-    const resp = await fetch('/api/wiki/sidebar')
+    const resp = await fetch(`/api/wiki/sidebar?lang=${locale.value}`)
     if (resp.ok) {
       entries.value = await resp.json()
       const currentPath = route.path
@@ -35,6 +36,13 @@ onMounted(async () => {
       autoExpand(entries.value)
     }
   } catch { /* ignore */ }
+}
+
+onMounted(loadSidebar)
+// 切换语言后目录标题要跟着换（en 走 frontend/wiki/en 树）
+watch(locale, () => {
+  expanded.value.clear()
+  loadSidebar()
 })
 </script>
 

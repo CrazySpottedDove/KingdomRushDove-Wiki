@@ -4,6 +4,8 @@ import fs from 'fs'
 import path from 'path'
 
 const wikiDir = path.resolve(__dirname, 'wiki')
+// 英文内容树（与线上 src/wiki_services.rs 的约定一致）
+const wikiEnDir = path.resolve(wikiDir, 'en')
 
 function extractTitle(filePath: string): string {
   try {
@@ -15,28 +17,30 @@ function extractTitle(filePath: string): string {
   }
 }
 
-function buildSidebar(dir: string, basePath: string): any[] {
+function buildSidebar(dir: string, basePath: string, relBase: string = wikiDir): any[] {
   const entries: any[] = []
   const items = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
   
   for (const item of items) {
     if (item.name.startsWith('.')) continue
+    // en 是英文内容树，不在中文目录里显示
+    if (item.name === 'en' && dir === wikiDir) continue
     const fullPath = path.join(dir, item.name)
     
     if (item.isDirectory()) {
       if (!fs.existsSync(path.join(fullPath, 'index.md'))) continue
       const title = extractTitle(path.join(fullPath, 'index.md'))
-      const children = buildSidebar(fullPath, path.join(basePath, item.name))
+      const children = buildSidebar(fullPath, path.join(basePath, item.name), relBase)
       entries.push({
         name: item.name,
         title,
-        path: '/wiki/' + path.relative(wikiDir, fullPath).replace(/\\/g, '/'),
+        path: '/wiki/' + path.relative(relBase, fullPath).replace(/\\/g, '/'),
         is_dir: true,
         children,
       })
     } else if (item.name.endsWith('.md') && item.name !== 'index.md') {
       const title = extractTitle(fullPath)
-      const relPath = path.relative(wikiDir, fullPath).replace(/\\/g, '/').replace(/\.md$/, '')
+      const relPath = path.relative(relBase, fullPath).replace(/\\/g, '/').replace(/\.md$/, '')
       entries.push({
         name: item.name.replace(/\.md$/, ''),
         title,
@@ -58,7 +62,10 @@ export default defineConfig({
         // 拦截 /api/wiki/sidebar，从本地目录生成
         server.middlewares.use('/api/wiki/sidebar', (req, res) => {
           try {
-            const entries = buildSidebar(wikiDir, '')
+            const lang = new URL(req.url || '/', 'http://localhost').searchParams.get('lang')
+            const entries = lang === 'en' && fs.existsSync(wikiEnDir)
+              ? buildSidebar(wikiEnDir, '', wikiDir)
+              : buildSidebar(wikiDir, '')
             res.writeHead(200, { 'Content-Type': 'application/json' })
             res.end(JSON.stringify(entries))
           } catch (e: any) {

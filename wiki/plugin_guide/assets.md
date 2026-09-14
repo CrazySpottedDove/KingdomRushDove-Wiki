@@ -154,7 +154,7 @@ return {
 			"kr4_fallen_ones_spirit_mausoleum_possession_hit.ogg",
 		},
 		-- 插件声音组独有，用于指定插件声音组的路径
-		parent_dir = "${entry}/assets/sounds",
+		parent_dir = "plugins/${entry}/assets/sounds",
 	},
 }
 ```

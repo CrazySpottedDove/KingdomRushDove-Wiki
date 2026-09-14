@@ -2046,7 +2046,7 @@ watch(
 
     <!-- ── Upload box ── -->
     <div class="upload-box" v-show="storeView === 'plugins'">
-      <h2>📤 {{ t('store.upload.title') }}</h2>
+      <h2>{{ t('store.upload.title') }}</h2>
       <div
         id="uploadLoginNotice"
         class="login-notice"
@@ -2152,7 +2152,7 @@ watch(
             id="sort-hot"
             @click="setSort('hot')"
           >
-            🔥 {{ t('store.sort.hot') }}
+            {{ t('store.sort.hot') }}
           </button>
           <button
             class="btn-sort"
@@ -2160,7 +2160,7 @@ watch(
             id="sort-downloads"
             @click="setSort('downloads')"
           >
-            ⬇ {{ t('store.sort.downloads') }}
+            {{ t('store.sort.downloads') }}
           </button>
           <button
             class="btn-sort"
@@ -2168,7 +2168,7 @@ watch(
             id="sort-newest"
             @click="setSort('newest')"
           >
-            🆕 {{ t('store.sort.newest') }}
+            {{ t('store.sort.newest') }}
           </button>
         </div>
       </div>
@@ -2322,7 +2322,7 @@ watch(
     >
       <div class="modal">
         <div class="modal-header">
-          <h3>🔔 {{ t('store.notif.title') }}</h3>
+          <h3>{{ t('store.notif.title') }}</h3>
           <button class="modal-close" @click="closeModal('notificationsModal')">×</button>
         </div>
         <div
@@ -2364,7 +2364,7 @@ watch(
     >
       <div class="modal">
         <div class="modal-header">
-          <h3>👤 {{ t('challenge.user.title') }}</h3>
+          <h3>{{ t('challenge.user.title') }}</h3>
           <button class="modal-close" @click="closeModal('userModal')">×</button>
         </div>
         <div class="modal-tabs">
@@ -2446,7 +2446,7 @@ watch(
     >
       <div class="modal">
         <div class="modal-header">
-          <h3>🔑 {{ t('store.admin.title') }}</h3>
+          <h3>{{ t('store.admin.title') }}</h3>
           <button class="modal-close" @click="closeModal('adminModal')">×</button>
         </div>
         <p
@@ -2485,7 +2485,7 @@ watch(
     >
       <div class="modal">
         <div class="modal-header">
-          <h3>🗑 {{ t('store.delete.title') }}</h3>
+          <h3>{{ t('store.delete.title') }}</h3>
           <button class="modal-close" @click="closeModal('deleteModal')">×</button>
         </div>
         <p

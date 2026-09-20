@@ -120,7 +120,8 @@ do
 	game.plugin_required_textures["${entry}_group1"] = {
 		-- Do not load bytecode, i.e. your texture group file is a human-readable .lua
 		use_bytecode = false,
-		-- Load path, must not end with "/"; ${entry_group1} must be found under it
+		-- Load path, relative to the save directory's plugins/ folder - no "plugins/"
+		-- prefix; must not end with "/", and ${entry_group1} must be found under it
 		path = "${entry}/assets/images",
 	}
 
@@ -154,7 +155,8 @@ return {
 			"kr4_fallen_ones_spirit_mausoleum_possession_hit.ogg",
 		},
 		-- Specific to plugin sound groups: the path of the plugin's sound group
-		parent_dir = "plugins/${entry}/assets/sounds",
+		-- Also relative to the save directory's plugins/ folder; no "plugins/" prefix
+		parent_dir = "${entry}/assets/sounds",
 	},
 }
 ```

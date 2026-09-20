@@ -120,7 +120,8 @@ do
 	game.plugin_required_textures["${entry}_group1"] = {
 		-- 不使用 bytecode 方式加载，也就是说，你的纹理组文件是个人类可读的 .lua 文件
 		use_bytecode = false,
-		-- 加载路径，末尾不应有 "/"，该路径下需要能够找到 ${entry_group1}
+		-- 加载路径，相对存档的 plugins/ 目录，无需再写 "plugins/" 前缀；
+		-- 末尾不应有 "/"，该路径下需要能够找到 ${entry_group1}
 		path = "${entry}/assets/images",
 	}
 
@@ -154,7 +155,8 @@ return {
 			"kr4_fallen_ones_spirit_mausoleum_possession_hit.ogg",
 		},
 		-- 插件声音组独有，用于指定插件声音组的路径
-		parent_dir = "plugins/${entry}/assets/sounds",
+		-- 同样相对存档的 plugins/ 目录，无需再写 "plugins/" 前缀
+		parent_dir = "${entry}/assets/sounds",
 	},
 }
 ```

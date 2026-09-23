@@ -2170,6 +2170,9 @@ watch(
           >
             {{ t('store.sort.newest') }}
           </button>
+          <router-link class="btn-sort rank-link" to="/plugins/rank">
+            📈 {{ t('rank.store_link') }}
+          </router-link>
         </div>
       </div>
     </div>
@@ -3006,6 +3009,12 @@ watch(
   color: #000;
   border-color: var(--accent);
   font-weight: 600;
+}
+/* 下载热度榜入口：与排序按钮同款外观，但它是链接 */
+.rank-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* ── Plugin grid ───────────────────────────────── */

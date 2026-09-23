@@ -14,6 +14,12 @@ const router = createRouter({
       component: () => import('../views/PluginStore.vue'),
     },
     {
+      // 下载增量热度榜：不进导航栏，入口挂在插件商店页
+      path: '/plugins/rank',
+      name: 'pluginRank',
+      component: () => import('../views/PluginRank.vue'),
+    },
+    {
       path: '/challenges',
       name: 'challenges',
       component: () => import('../views/ChallengesPage.vue'),

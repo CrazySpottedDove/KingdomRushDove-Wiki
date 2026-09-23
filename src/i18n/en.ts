@@ -71,6 +71,7 @@ export const en: Record<MessageKey, string> = {
   'home.download.before':
     'To reduce bandwidth pressure and keep the plugin and update services stable, downloading the game itself from this server is no longer supported. You can get it from the',
   'home.download.link': 'Quark drive link',
+  'home.download.link_mega': 'Mega.nz link',
   'home.download.after':
     ', or join the QQ group 698678477. Any other source is unofficial, and its availability and safety cannot be guaranteed.',
   'home.donate.title': 'Donate',

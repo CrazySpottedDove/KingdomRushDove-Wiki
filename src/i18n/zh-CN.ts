@@ -73,6 +73,7 @@ export const zhCN = {
   'home.download.title': '下载说明',
   'home.download.before': '为减轻服务器网络带宽压力，提供更稳定的插件服务和更新服务，现已不支持通过服务器下载游戏本体。可尝试从',
   'home.download.link': '夸克网盘链接',
+  'home.download.link_mega': 'MEGA 网盘链接',
   'home.download.after': '，或进入交流 QQ 群 698678477 获取资源。其余获取渠道均为非官方渠道，不保证时效性和安全性。',
   'home.donate.title': '赞赏',
   'home.donate.body': '如果你觉得做得不错，请作者喝杯牢大茶吧，这是对我很好的鼓励！',

@@ -44,7 +44,7 @@ import { t } from '../i18n'
 
     <h2 class="sec">{{ t('home.download.title') }}</h2>
     <div class="download-notice">
-      <p>{{ t('home.download.before') }} <a href="https://pan.quark.cn/s/f79b8c288102?pwd=V2Ec">{{ t('home.download.link') }}</a>{{ t('home.download.after') }}</p>
+      <p>{{ t('home.download.before') }} <a href="https://pan.quark.cn/s/f79b8c288102?pwd=V2Ec">{{ t('home.download.link') }}</a>/<a href="https://mega.nz/folder/0cc3TDxS#9HzrDKYNdsAVuiS0WaRZXQ"></a>{{ t('home.download.link_mega') }}<a/>{{ t('home.download.after') }}</p>
     </div>
 
     <h2 class="sec">{{ t('home.donate.title') }}</h2>

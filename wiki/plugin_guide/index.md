@@ -28,10 +28,24 @@ return {
 	category = "other", -- 插件类型。可选项："gameplay"（玩法）, "cosmetic"（美化）, "display"（显示）, "tower"（防御塔）, "hero"（英雄）, "enemy"（敌人）, "level"（关卡）, "other"（其它）,
 	enabled = true, -- 启用状态，关闭则不加载此 mod
 	priority = 0, -- 插件启用优先级，若不知道可填 0
+	min_version = "2.0.7.8", -- 可选：运行本插件所需的最低本体版本。省略或留空表示不限制
 }
 ```
 
-每一条插件元数据都不可为 `nil`。
+除可选的 `min_version` 外，每一条插件元数据都不可为 `nil`。
+
+### min_version：限制本体最低版本
+
+`min_version` 是一个**可选**字段，用于声明「本插件必须在哪个本体版本及以上才能运行」。它的值是一个点分版本号字符串，与本体 `version.lua` 中的 `id` 字段（例如 `2.0.7.7`）比较。
+
+当玩家在插件管理器中尝试**下载或更新**该插件时，本体版本会与 `min_version` 逐段比较：
+
+- 本体版本 **大于等于** `min_version`：正常下载/安装。
+- 本体版本 **严格小于** `min_version`：拒绝下载/更新，并弹窗提示玩家「`插件名(插件版本)` 需要 `min_version` 版本本体才可运行，请先更新本体」。
+
+省略 `min_version`、或将其写成空字符串时，表示不限制本体版本，行为与旧插件完全一致。
+
+因此，只要你的插件用到了新版本本体才有的接口、资源或字段，就应该填上 `min_version`，避免老版本玩家装上后无法运行。
 
 ## 插件入口文件
 
@@ -59,26 +73,21 @@ return hook
 
 ## 插件配置文件
 
-插件配置文件是一个 Dove 版本体约定的文件，用于允许玩家在插件管理器中点击配置按钮来调整插件的参数。其内容格式如下：
+除元数据文件 `config.lua` 外，插件还可以提供一个**可选**的配置文件 `${entry}_config.lua`，用于让玩家在插件管理器中点击「配置」按钮调整插件的参数。省略该文件时，插件没有任何可调参数，插件管理器中也不会出现配置按钮。
 
 ```lua
+-- ${entry}_config.lua
 return {
-	-- 一些可配置字段，支持数字、布尔值、扁平数组，下面是一些字段示例
 	attack_cooldown = 1,
 	use_damage_true = false,
-	attack_damages = {
-		50,
-		100,
-		150,
-	},
-	-- key_label_map 负责给出这些可配置字段的名称
 	key_label_map = {
 		attack_cooldown = "普攻冷却时间(秒)",
 		use_damage_true = "造成真实伤害",
-		attack_damages = "普攻各级伤害",
 	},
 }
 ```
+
+完整写法、保留字段与更新时的合并规则，见 [⚙️ 插件配置](config) 章节。
 
 在你的插件中，应当这样引入插件配置文件：
 
@@ -91,8 +100,9 @@ local config = require("${entry}.${entry}_config")
 
 ## 章节
 
-- [🔌 开发者模式](developer) — 开启上传功能，在游戏内直接上传/更新插件
-- [🛠️ 修改模板](templates) — 在插件中修改防御塔、英雄、敌人等实体模板
-- [🎨 资源管理](assets) — 纹理、音乐、语言、数据资源的导入与注册
-- [🔥 热重载](hot_reload) — 不重启游戏应用插件修改（reload / unload / on_config_change）
-- [🗺️ 自制关卡地图制作](custom_levels) — 以恶魔山谷为范例，讲解地图插件的完整结构与制作方法
+- [🔌 开发者模式](/wiki/plugin_guide/developer) — 开启上传功能，在游戏内直接上传/更新插件
+- [🛠️ 修改模板](/wiki/plugin_guide/templates) — 在插件中修改防御塔、英雄、敌人等实体模板
+- [🎨 资源管理](/wiki/plugin_guide/assets) — 纹理、音乐、语言、数据资源的导入与注册
+- [⚙️ 插件配置](/wiki/plugin_guide/config) — `${entry}_config.lua` 的写法、保留字段与更新合并规则
+- [🔥 热重载](/wiki/plugin_guide/hot_reload) — 不重启游戏应用插件修改（reload / unload / on_config_change）
+- [🗺️ 自制关卡地图制作](/wiki/plugin_guide/custom_levels) — 以恶魔山谷为范例，讲解地图插件的完整结构与制作方法

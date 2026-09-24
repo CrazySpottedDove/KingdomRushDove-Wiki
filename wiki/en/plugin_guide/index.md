@@ -28,10 +28,24 @@ return {
 	category = "other", -- Plugin type. One of: "gameplay", "cosmetic", "display", "tower", "hero", "enemy", "level", "other",
 	enabled = true, -- Enabled state; when false the mod is not loaded
 	priority = 0, -- Load priority; use 0 if unsure
+	min_version = "2.0.7.8", -- Optional: minimum game version required to run this plugin. Omit or leave empty for no restriction
 }
 ```
 
-None of the metadata fields may be `nil`.
+Except for the optional `min_version`, none of the metadata fields may be `nil`.
+
+### min_version: requiring a minimum game version
+
+`min_version` is an **optional** field that declares "this plugin only runs on this game version or newer". Its value is a dotted version string, compared against the `id` field of the game's own `version.lua` (for example `2.0.7.7`).
+
+When a player tries to **download or update** the plugin from the plugin manager, the game version is compared against `min_version` segment by segment:
+
+- Game version **greater than or equal to** `min_version`: download/install proceeds normally.
+- Game version **strictly lower than** `min_version`: the download/update is refused, and the player sees a popup saying "`plugin name (plugin version)` requires game version `min_version` or newer. Please update the game first."
+
+Omitting `min_version`, or setting it to an empty string, means no version restriction at all — identical to how older plugins behave.
+
+So if your plugin uses interfaces, assets or fields that only exist in newer game builds, set `min_version` so players on older builds are not left with a plugin that cannot run.
 
 ## Plugin entry file
 
@@ -60,26 +74,21 @@ Write the plugin introduction in `README.md`; it becomes the detail content you 
 
 ## Plugin configuration file
 
-The configuration file is a Dove convention that lets players adjust plugin parameters from the config button in the plugin manager. Its format:
+Besides the metadata file `config.lua`, a plugin may ship an **optional** configuration file `${entry}_config.lua` that lets players tune plugin parameters from the config button in the plugin manager. Without that file the plugin simply has no tunable parameters and no config button appears.
 
 ```lua
+-- ${entry}_config.lua
 return {
-	-- Configurable fields: numbers, booleans and flat arrays are supported
 	attack_cooldown = 1,
 	use_damage_true = false,
-	attack_damages = {
-		50,
-		100,
-		150,
-	},
-	-- key_label_map gives the display name of each configurable field
 	key_label_map = {
 		attack_cooldown = "Attack cooldown (s)",
 		use_damage_true = "Deal true damage",
-		attack_damages = "Attack damage per level",
 	},
 }
 ```
+
+For the full format, the reserved fields and the merge rules applied on update, see the [⚙️ Plugin Configuration](/wiki/plugin_guide/config) chapter.
 
 Inside your plugin, require the config file like this:
 
@@ -92,8 +101,9 @@ For namespace isolation, any file that belongs to a plugin directory should be r
 
 ## Chapters
 
-- [🔌 Developer Mode](developer) — enable uploads and manage plugins straight from the game
-- [🛠️ Editing Templates](templates) — modify tower, hero, enemy and other entity templates
-- [🎨 Asset Management](assets) — import and register textures, music, languages and data
-- [🔥 Hot Reload](hot_reload) — apply plugin changes without restarting (reload / unload / on_config_change)
-- [🗺️ Custom Level Maps](custom_levels) — the full structure of a map plugin, using Demon Valley as the example
+- [🔌 Developer Mode](/wiki/plugin_guide/developer) — enable uploads and manage plugins straight from the game
+- [🛠️ Editing Templates](/wiki/plugin_guide/templates) — modify tower, hero, enemy and other entity templates
+- [🎨 Asset Management](/wiki/plugin_guide/assets) — import and register textures, music, languages and data
+- [⚙️ Plugin Configuration](/wiki/plugin_guide/config) — `${entry}_config.lua`, its reserved fields and update merge rules
+- [🔥 Hot Reload](/wiki/plugin_guide/hot_reload) — apply plugin changes without restarting (reload / unload / on_config_change)
+- [🗺️ Custom Level Maps](/wiki/plugin_guide/custom_levels) — the full structure of a map plugin, using Demon Valley as the example

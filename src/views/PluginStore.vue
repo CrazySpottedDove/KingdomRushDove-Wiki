@@ -31,6 +31,7 @@ const currentItems = ref<any[]>([])
 const _searchTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const _pendingEntry = ref<string | null>(null)
 const _commentEntry = ref<string | null>(null)
+const _commentAuthor = ref('')
 const commentPluginName = ref('')
 const _userTab = ref('login')
 const _zipFile = ref<File | null>(null)
@@ -651,6 +652,7 @@ async function showDetail(entry: string) {
 function showComments(entry: string) {
   const plugin = currentItems.value.find(p => p.entry === entry)
   _commentEntry.value = entry
+  _commentAuthor.value = plugin?.by || ''
   commentPluginName.value = plugin?.name || entry
   showCommentsModal.value = true
 }
@@ -2692,6 +2694,7 @@ watch(
       v-model="showCommentsModal"
       :entry="_commentEntry || ''"
       :plugin-name="commentPluginName"
+      :plugin-author="_commentAuthor"
       @close="showCommentsModal = false"
       @count-change="onCommentCountChange"
       @need-login="toggleUser"

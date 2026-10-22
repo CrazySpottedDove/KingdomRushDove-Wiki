@@ -64,6 +64,7 @@ const showDetail = ref(false)
 const showComments = ref(false)
 const commentsEntry = ref('')
 const commentPluginName = ref('')
+const commentPluginAuthor = ref('')
 
 // Login modal
 const showLogin = ref(false)
@@ -228,6 +229,7 @@ async function batchDelete() {
 async function showPluginComments(entry: string, plugin: any) {
   commentsEntry.value = entry
   commentPluginName.value = plugin?.name || entry
+  commentPluginAuthor.value = plugin?.by || ''
   showComments.value = true
 }
 
@@ -566,6 +568,7 @@ onMounted(async () => {
       v-model="showComments"
       :entry="commentsEntry"
       :plugin-name="commentPluginName"
+      :plugin-author="commentPluginAuthor"
       @close="closeComments"
       @count-change="onCommentCountChange"
       @need-login="showLogin = true"

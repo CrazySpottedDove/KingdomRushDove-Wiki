@@ -78,7 +78,7 @@ return {
 
 ## 在插件中读取配置
 
-配置文件位于插件根目录，由于 `plugins/?.lua` 在 require 路径中，使用 `${entry}.` 前缀引入即可：
+配置文件位于插件根目录，require 时写 `${entry}.` 前缀：
 
 ```lua
 local config = require("${entry}.${entry}_config")

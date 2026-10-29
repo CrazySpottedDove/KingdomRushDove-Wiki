@@ -1,6 +1,6 @@
 # 插件开发文档
 
-欢迎进入插件开发的世界！
+欢迎进入插件开发的世界！本章也收录本体扩展内容：添加英雄、科技线和法术。
 
 ## 插件的位置
 
@@ -50,7 +50,7 @@ return {
 
 ### branch：发布渠道
 
-`branch` 是**可选**字段，默认 `master`。它只决定插件上传到哪个商店渠道、被哪些客户端看到，**不影响本地加载**；本地是否加载仍由 `enabled` 和插件管理器决定。
+游戏默认版跟随 `master` 分支，开发者预览版跟随 `dev` 分支。插件渠道与之一一对应；`branch` 只决定插件上传到哪个商店渠道、被哪些客户端看到，**不影响本地加载**，本地是否加载仍由 `enabled` 和插件管理器决定。
 
 | 值 | 含义 |
 |---|---|
@@ -59,38 +59,10 @@ return {
 
 规则：
 
-- 上传时客户端把 `config.branch` 作为 `X-Plugin-Branch` 提交，服务端分别存到 master / dev 两套命名空间；同一个 `entry` 在两个渠道互不覆盖。
-- 每个渠道第一次必须全量上传，之后才允许增量上传；否则服务端返回“该分支没有该插件，请先进行全量上传”。
+- 服务端分别存 master / dev 两套命名空间；同一个 `entry` 在两个渠道互不覆盖。
 - 开发者预览版商店会同时拿到 master 和 dev 两个版本：dev 版本不低于 master 时展示 dev，否则展示 master；如果一方声明的 `min_version` 当前本体不满足，则优先展示兼容的那一方。
 - dev 条目的下载量固定为 0；有同名 master 条目时，评论、点赞、封面沿用 master 条目。
 - 只有 `branch = "master"` 的插件上传时才会询问 `cover.*` 封面。
-- 改 `branch` 不会自动迁移已上传内容，需要按新渠道重新上传。
-
-正式版：
-
-```lua
-return {
-	name = "示例插件",
-	entry = "example",
-	version = "1.2.0",
-	branch = "master",
-	enabled = true,
-	priority = 0,
-}
-```
-
-只给预览版客户端看的测试版：
-
-```lua
-return {
-	name = "示例插件",
-	entry = "example",
-	version = "1.3.0-beta",
-	branch = "dev",
-	enabled = true,
-	priority = 0,
-}
-```
 
 ## 插件入口文件
 
@@ -151,4 +123,6 @@ local config = require("${entry}.${entry}_config")
 - [⚙️ 插件配置](/wiki/plugin_guide/config) — `${entry}_config.lua` 的写法、保留字段与更新合并规则
 - [🔥 热重载](/wiki/plugin_guide/hot_reload) — 不重启游戏应用插件修改（reload / unload / on_config_change）
 - [🗺️ 自制关卡地图制作](/wiki/plugin_guide/custom_levels) — 以恶魔山谷为范例，讲解地图插件的完整结构与制作方法
-- [🛠️ 开发者文档](/wiki/dev) — 发布渠道与英雄注册
+- [🦸 添加英雄（registry）](/wiki/plugin_guide/heroes) — 从声明到图集、动画、音效、i18n 的完整流程
+- [⚗️ 添加科技线](/wiki/plugin_guide/tech_lines) — 新建 `lineN.lua`、注册到下拉、写科技 patch
+- [✨ 添加法术](/wiki/plugin_guide/spells) — 新建 SPELL 模块、注册模板、资源与等级成长

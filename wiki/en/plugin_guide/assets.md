@@ -375,3 +375,12 @@ end
 ```
 
 Note that anywhere else in the plugin that uses these language assets must run after the merge.
+
+2026-10-29 update: you can also use the `merge_locales` helper provided by `i18n` and call it from `init`:
+
+```lua
+do
+    local i18n = require("i18n")
+    i18n:merge_locales(i18n.current_locale or i18n.default_locale, "${entry}.assets.strings")
+end
+```

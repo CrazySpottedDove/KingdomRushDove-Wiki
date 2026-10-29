@@ -375,3 +375,12 @@ end
 ```
 
 注意插件中其他使用这些语言资源的地方，其调用应在语言资源合并之后。
+
+2026-10-29补充：也可直接使用 `i18n` 提供的 `merge_locales` 接口，并在 init 时写：
+
+```lua
+do
+    local i18n = require("i18n")
+    i18n:merge_locales(i18n.current_locale or i18n.default_locale, "${entry}.assets.strings")
+end
+```

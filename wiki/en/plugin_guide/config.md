@@ -78,7 +78,7 @@ The three field names below are **reserved** by the game. They only describe the
 
 ## Reading the config inside your plugin
 
-The configuration file sits in the plugin root, and since `plugins/?.lua` is on the require path you load it with the `${entry}.` prefix:
+The configuration file sits in the plugin root; require it with the `${entry}.` prefix:
 
 ```lua
 local config = require("${entry}.${entry}_config")

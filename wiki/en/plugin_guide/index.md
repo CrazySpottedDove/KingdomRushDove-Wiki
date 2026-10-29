@@ -1,6 +1,6 @@
 # Plugin Development Guide
 
-Welcome to the world of plugin development!
+Welcome to the world of plugin development! This chapter also covers core extensions: adding heroes, tech lines and spells.
 
 ## Where plugins live
 
@@ -50,7 +50,7 @@ So if your plugin uses interfaces, assets or fields that only exist in newer gam
 
 ### branch: release channel
 
-`branch` is **optional** and defaults to `master`. It only controls which store channel the plugin is uploaded to and which clients can see it. It does **not** affect local loading; that is still controlled by `enabled` and the plugin manager.
+The default game build follows `master`; the developer preview follows `dev`. Plugin channels map one-to-one; `branch` only decides which store channel the plugin is uploaded to and which clients can see it. It does **not** affect local loading; that is still controlled by `enabled` and the plugin manager.
 
 | Value | Meaning |
 |---|---|
@@ -59,38 +59,10 @@ So if your plugin uses interfaces, assets or fields that only exist in newer gam
 
 Rules:
 
-- On upload the client sends `config.branch` as `X-Plugin-Branch`; the server keeps separate master/dev namespaces, so the same `entry` does not overwrite the other channel.
-- The first upload in each channel must be a full upload; incremental uploads are only accepted afterwards. Otherwise the server returns "this branch has no such plugin; please upload the full package first".
+- The server keeps separate master/dev namespaces; the same `entry` does not overwrite the other channel.
 - A developer-preview store receives both master and dev releases: the dev release is shown when its version is not lower than master, otherwise master is shown. If one side declares a `min_version` the current game does not satisfy, the compatible side wins.
 - A dev release always reports 0 downloads. When a master entry with the same name exists, its comments, likes and cover are reused.
 - Only `branch = "master"` uploads ask about a `cover.*` file.
-- Changing `branch` does not migrate already uploaded content; upload again into the new channel.
-
-Stable release:
-
-```lua
-return {
-	name = "Example plugin",
-	entry = "example",
-	version = "1.2.0",
-	branch = "master",
-	enabled = true,
-	priority = 0,
-}
-```
-
-Preview-only build:
-
-```lua
-return {
-	name = "Example plugin",
-	entry = "example",
-	version = "1.3.0-beta",
-	branch = "dev",
-	enabled = true,
-	priority = 0,
-}
-```
 
 ## Plugin entry file
 
@@ -152,3 +124,6 @@ For namespace isolation, any file that belongs to a plugin directory should be r
 - [⚙️ Plugin Configuration](/wiki/plugin_guide/config) — `${entry}_config.lua`, its reserved fields and update merge rules
 - [🔥 Hot Reload](/wiki/plugin_guide/hot_reload) — apply plugin changes without restarting (reload / unload / on_config_change)
 - [🗺️ Custom Level Maps](/wiki/plugin_guide/custom_levels) — the full structure of a map plugin, using Demon Valley as the example
+- [🦸 Adding a Hero](/wiki/plugin_guide/heroes) — registry declaration through textures, animations, sounds and i18n
+- [⚗️ Adding a Tech Line](/wiki/plugin_guide/tech_lines) — new `lineN.lua`, dropdown registration, tech patches
+- [✨ Adding a Spell](/wiki/plugin_guide/spells) — SPELL module, templates, assets and level scaling

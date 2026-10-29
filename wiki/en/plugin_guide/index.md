@@ -28,11 +28,12 @@ return {
 	category = "other", -- Plugin type. One of: "gameplay", "cosmetic", "display", "tower", "hero", "enemy", "level", "other",
 	enabled = true, -- Enabled state; when false the mod is not loaded
 	priority = 0, -- Load priority; use 0 if unsure
+	branch = "master", -- Optional: release channel, "master" stable / "dev" developer preview
 	min_version = "2.0.7.8", -- Optional: minimum game version required to run this plugin. Omit or leave empty for no restriction
 }
 ```
 
-Except for the optional `min_version`, none of the metadata fields may be `nil`.
+Except for the optional `min_version` and `branch`, none of the metadata fields may be `nil`.
 
 ### min_version: requiring a minimum game version
 
@@ -46,6 +47,50 @@ When a player tries to **download or update** the plugin from the plugin manager
 Omitting `min_version`, or setting it to an empty string, means no version restriction at all — identical to how older plugins behave.
 
 So if your plugin uses interfaces, assets or fields that only exist in newer game builds, set `min_version` so players on older builds are not left with a plugin that cannot run.
+
+### branch: release channel
+
+`branch` is **optional** and defaults to `master`. It only controls which store channel the plugin is uploaded to and which clients can see it. It does **not** affect local loading; that is still controlled by `enabled` and the plugin manager.
+
+| Value | Meaning |
+|---|---|
+| `"master"` (default) | Stable channel: visible to every client and counted in download/hot rankings. |
+| `"dev"` | Preview channel: only visible to developer-preview builds (`version.branch == "dev"`); the entry is marked `[dev]`. |
+
+Rules:
+
+- On upload the client sends `config.branch` as `X-Plugin-Branch`; the server keeps separate master/dev namespaces, so the same `entry` does not overwrite the other channel.
+- The first upload in each channel must be a full upload; incremental uploads are only accepted afterwards. Otherwise the server returns "this branch has no such plugin; please upload the full package first".
+- A developer-preview store receives both master and dev releases: the dev release is shown when its version is not lower than master, otherwise master is shown. If one side declares a `min_version` the current game does not satisfy, the compatible side wins.
+- A dev release always reports 0 downloads. When a master entry with the same name exists, its comments, likes and cover are reused.
+- Only `branch = "master"` uploads ask about a `cover.*` file.
+- Changing `branch` does not migrate already uploaded content; upload again into the new channel.
+
+Stable release:
+
+```lua
+return {
+	name = "Example plugin",
+	entry = "example",
+	version = "1.2.0",
+	branch = "master",
+	enabled = true,
+	priority = 0,
+}
+```
+
+Preview-only build:
+
+```lua
+return {
+	name = "Example plugin",
+	entry = "example",
+	version = "1.3.0-beta",
+	branch = "dev",
+	enabled = true,
+	priority = 0,
+}
+```
 
 ## Plugin entry file
 

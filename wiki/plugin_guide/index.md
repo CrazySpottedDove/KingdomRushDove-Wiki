@@ -28,11 +28,12 @@ return {
 	category = "other", -- 插件类型。可选项："gameplay"（玩法）, "cosmetic"（美化）, "display"（显示）, "tower"（防御塔）, "hero"（英雄）, "enemy"（敌人）, "level"（关卡）, "other"（其它）,
 	enabled = true, -- 启用状态，关闭则不加载此 mod
 	priority = 0, -- 插件启用优先级，若不知道可填 0
+	branch = "master", -- 可选：发布渠道，"master" 正式 / "dev" 开发预览
 	min_version = "2.0.7.8", -- 可选：运行本插件所需的最低本体版本。省略或留空表示不限制
 }
 ```
 
-除可选的 `min_version` 外，每一条插件元数据都不可为 `nil`。
+除可选的 `min_version` 和 `branch` 外，每一条插件元数据都不可为 `nil`。
 
 ### min_version：限制本体最低版本
 
@@ -46,6 +47,50 @@ return {
 省略 `min_version`、或将其写成空字符串时，表示不限制本体版本，行为与旧插件完全一致。
 
 因此，只要你的插件用到了新版本本体才有的接口、资源或字段，就应该填上 `min_version`，避免老版本玩家装上后无法运行。
+
+### branch：发布渠道
+
+`branch` 是**可选**字段，默认 `master`。它只决定插件上传到哪个商店渠道、被哪些客户端看到，**不影响本地加载**；本地是否加载仍由 `enabled` 和插件管理器决定。
+
+| 值 | 含义 |
+|---|---|
+| `"master"`（默认） | 正式渠道：所有客户端可见，参与下载量/热度统计 |
+| `"dev"` | 预览渠道：只有开发者预览版（`version.branch == "dev"`）的商店可见，条目带 `[dev]` |
+
+规则：
+
+- 上传时客户端把 `config.branch` 作为 `X-Plugin-Branch` 提交，服务端分别存到 master / dev 两套命名空间；同一个 `entry` 在两个渠道互不覆盖。
+- 每个渠道第一次必须全量上传，之后才允许增量上传；否则服务端返回“该分支没有该插件，请先进行全量上传”。
+- 开发者预览版商店会同时拿到 master 和 dev 两个版本：dev 版本不低于 master 时展示 dev，否则展示 master；如果一方声明的 `min_version` 当前本体不满足，则优先展示兼容的那一方。
+- dev 条目的下载量固定为 0；有同名 master 条目时，评论、点赞、封面沿用 master 条目。
+- 只有 `branch = "master"` 的插件上传时才会询问 `cover.*` 封面。
+- 改 `branch` 不会自动迁移已上传内容，需要按新渠道重新上传。
+
+正式版：
+
+```lua
+return {
+	name = "示例插件",
+	entry = "example",
+	version = "1.2.0",
+	branch = "master",
+	enabled = true,
+	priority = 0,
+}
+```
+
+只给预览版客户端看的测试版：
+
+```lua
+return {
+	name = "示例插件",
+	entry = "example",
+	version = "1.3.0-beta",
+	branch = "dev",
+	enabled = true,
+	priority = 0,
+}
+```
 
 ## 插件入口文件
 
@@ -106,3 +151,4 @@ local config = require("${entry}.${entry}_config")
 - [⚙️ 插件配置](/wiki/plugin_guide/config) — `${entry}_config.lua` 的写法、保留字段与更新合并规则
 - [🔥 热重载](/wiki/plugin_guide/hot_reload) — 不重启游戏应用插件修改（reload / unload / on_config_change）
 - [🗺️ 自制关卡地图制作](/wiki/plugin_guide/custom_levels) — 以恶魔山谷为范例，讲解地图插件的完整结构与制作方法
+- [🛠️ 开发者文档](/wiki/dev) — 发布渠道与英雄注册

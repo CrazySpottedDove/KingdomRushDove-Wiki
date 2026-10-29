@@ -57,6 +57,12 @@ const collectionEntries = ref('')
 const collectionErr = ref('')
 const deleteName = ref('')
 const deleteErr = ref('')
+const deleteMaster = ref(true)
+const deleteDev = ref(true)
+const showDevPluginsModal = ref(false)
+const devPlugins = ref<any[]>([])
+const devPluginsErr = ref('')
+const devPluginsLoading = ref(false)
 
 const notificationList = ref<any[]>([])
 const notificationLoading = ref(false)
@@ -342,6 +348,7 @@ function closeModal(id: string) {
   else if (id === 'userModal') showUserModal.value = false
   else if (id === 'adminModal') showAdminModal.value = false
   else if (id === 'deleteModal') showDeleteModal.value = false
+  else if (id === 'devPluginsModal') showDevPluginsModal.value = false
   else if (id === 'detailModal') showDetailModal.value = false
   else if (id === 'commentsModal') showCommentsModal.value = false
 }
@@ -704,21 +711,73 @@ function openDelete(entry: string) {
   _pendingEntry.value = entry
   deleteName.value = p ? p.name : entry
   deleteErr.value = ''
+  deleteMaster.value = true
+  deleteDev.value = true
+  showDeleteModal.value = true
+}
+
+async function openDevPlugins() {
+  if (!auth.userAuth) {
+    toggleUser()
+    return
+  }
+  devPluginsErr.value = ''
+  devPluginsLoading.value = true
+  showDevPluginsModal.value = true
+  try {
+    const resp = await fetch('/plugins/my_dev', {
+      headers: auth.bearerHeaders() as Record<string, string>,
+    })
+    if (resp.status === 401) {
+      auth.clearUserAuth()
+      devPluginsErr.value = t('comments.auth_expired')
+      return
+    }
+    if (!resp.ok) {
+      devPluginsErr.value = await resp.text()
+      return
+    }
+    const body = await resp.json()
+    devPlugins.value = Array.isArray(body.items) ? body.items : []
+  } catch (e: any) {
+    devPluginsErr.value = t('common.network_error_detail', { error: e.message })
+  } finally {
+    devPluginsLoading.value = false
+  }
+}
+
+function openDevDelete(item: any) {
+  showDevPluginsModal.value = false
+  _pendingEntry.value = item.entry
+  deleteName.value = item.name || item.entry
+  deleteMaster.value = false
+  deleteDev.value = true
+  deleteErr.value = ''
   showDeleteModal.value = true
 }
 
 async function confirmDelete() {
-  const p = currentItems.value.find(x => x.entry === _pendingEntry.value)
-  if (!p) {
+  const entry = _pendingEntry.value
+  if (!entry) {
     showDeleteModal.value = false
+    return
+  }
+  const branches: string[] = []
+  if (deleteMaster.value) branches.push('master')
+  if (deleteDev.value) branches.push('dev')
+  if (branches.length === 0) {
+    deleteErr.value = t('store.delete.pick_branch')
     return
   }
   const headers = auth.adminToken ? auth.adminHeaders() : auth.bearerHeaders()
   try {
-    const resp = await fetch('/plugins/' + encodeURIComponent(p.entry), {
-      method: 'DELETE',
-      headers: headers as Record<string, string>,
-    })
+    const resp = await fetch(
+      '/plugins/' + encodeURIComponent(entry) + '?branches=' + branches.join(','),
+      {
+        method: 'DELETE',
+        headers: headers as Record<string, string>,
+      },
+    )
     if (resp.ok) {
       showDeleteModal.value = false
       await fetchPage()
@@ -2110,6 +2169,7 @@ watch(
         "
       >
         <button class="btn btn-primary" @click="uploadPlugin()">{{ t('store.upload.submit') }}</button>
+        <button class="btn" @click="openDevPlugins()">{{ t('store.dev_manage.button') }}</button>
         <span
           id="uploadStatus"
           :style="{ color: uploadStatusColor }"
@@ -2481,6 +2541,41 @@ watch(
       </div>
     </div>
 
+    <!-- Dev branch plugins modal -->
+    <div
+      class="modal-backdrop"
+      :class="{ show: showDevPluginsModal }"
+      id="devPluginsModal"
+      @click="onBackdropClick($event, 'devPluginsModal')"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <h3>{{ t('store.dev_manage.title') }}</h3>
+          <button class="modal-close" @click="closeModal('devPluginsModal')">×</button>
+        </div>
+        <div v-if="devPluginsLoading" style="color: var(--text-dim); font-size: 0.9rem;">
+          {{ t('store.dev_manage.loading') }}
+        </div>
+        <div v-else-if="devPlugins.length === 0" style="color: var(--text-dim); font-size: 0.9rem;">
+          {{ t('store.dev_manage.empty') }}
+        </div>
+        <div v-else style="display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow: auto;">
+          <div
+            v-for="item in devPlugins"
+            :key="item.entry"
+            style="display: flex; align-items: center; gap: 10px; justify-content: space-between; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;"
+          >
+            <div style="min-width: 0;">
+              <div style="font-weight: 600;">{{ item.name }}</div>
+              <div style="font-size: 0.8rem; color: var(--text-dim);">{{ item.entry }} · v{{ item.version }}</div>
+            </div>
+            <button class="btn-sm btn-danger-sm" @click="openDevDelete(item)">{{ t('challenge.btn.delete') }}</button>
+          </div>
+        </div>
+        <div class="modal-err" id="devPluginsErr">{{ devPluginsErr }}</div>
+      </div>
+    </div>
+
     <!-- Delete confirm modal -->
     <div
       class="modal-backdrop"
@@ -2502,6 +2597,16 @@ watch(
         >
           {{ t('store.delete.confirm_before') }} "<strong id="deleteName">{{ deleteName }}</strong>"{{ t('store.delete.confirm_after') }}
         </p>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 14px;">
+          <label style="display: flex; gap: 8px; align-items: center; font-size: 0.9rem;">
+            <input v-model="deleteMaster" type="checkbox" />
+            {{ t('store.delete.branch_master') }}
+          </label>
+          <label style="display: flex; gap: 8px; align-items: center; font-size: 0.9rem;">
+            <input v-model="deleteDev" type="checkbox" />
+            {{ t('store.delete.branch_dev') }}
+          </label>
+        </div>
         <div class="modal-btns">
           <button class="btn" @click="closeModal('deleteModal')">{{ t('common.cancel') }}</button>
           <button class="btn btn-danger" @click="confirmDelete()">{{ t('store.delete.submit') }}</button>

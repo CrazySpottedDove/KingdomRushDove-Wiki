@@ -544,6 +544,9 @@ export const en: Record<MessageKey, string> = {
   'category.hero': 'Heroes',
   'category.enemy': 'Enemies',
   'category.level': 'Levels',
+  'category.upgrade': 'Upgrades',
+  'category.generation': 'Generations',
+  'category.spell': 'Spells',
   'category.other': 'Other',
   // ── Plugin download leaderboard ────────────────
   'rank.title': 'Plugin download leaderboard',

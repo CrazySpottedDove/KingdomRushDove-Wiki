@@ -18,6 +18,9 @@ const CATEGORIES = [
   { slug: 'hero', icon: '🦸', get name() { return t('category.hero') } },
   { slug: 'enemy', icon: '👾', get name() { return t('category.enemy') } },
   { slug: 'level', icon: '🗺️', get name() { return t('category.level') } },
+  { slug: 'upgrade', icon: '⚙️', get name() { return t('category.upgrade') } },
+  { slug: 'generation', icon: '🧬', get name() { return t('category.generation') } },
+  { slug: 'spell', icon: '✨', get name() { return t('category.spell') } },
   { slug: 'other', icon: '📦', get name() { return t('category.other') } },
 ]
 const PAGE_SIZE = 15
@@ -3103,6 +3106,15 @@ watch(
 .chip-level {
   --chip-c: #ffe066;
 }
+.chip-upgrade {
+  --chip-c: #4dd4c6;
+}
+.chip-generation {
+  --chip-c: #b8e986;
+}
+.chip-spell {
+  --chip-c: #d0a9ff;
+}
 .chip-other {
   --chip-c: #868e96;
 }
@@ -3134,6 +3146,21 @@ watch(
   background: #ffe066;
   border-color: #ffe066;
   color: #333;
+}
+.chip.active[data-cat="upgrade"] {
+  background: #4dd4c6;
+  border-color: #4dd4c6;
+  color: #123;
+}
+.chip.active[data-cat="generation"] {
+  background: #b8e986;
+  border-color: #b8e986;
+  color: #123;
+}
+.chip.active[data-cat="spell"] {
+  background: #d0a9ff;
+  border-color: #d0a9ff;
+  color: #231238;
 }
 .chip.active[data-cat="other"] {
   background: #868e96;
@@ -3277,6 +3304,15 @@ watch(
 .cover-icon-level {
   color: #ffe066;
 }
+.cover-icon-upgrade {
+  color: #4dd4c6;
+}
+.cover-icon-generation {
+  color: #b8e986;
+}
+.cover-icon-spell {
+  color: #d0a9ff;
+}
 .card-body {
   padding: 12px 14px 8px;
   flex: 1;
@@ -3333,6 +3369,21 @@ watch(
   color: #ffe066;
   border-color: #5a5010;
   background: #2a2808;
+}
+.cat-upgrade {
+  color: #4dd4c6;
+  border-color: #1f5a55;
+  background: #0e2a28;
+}
+.cat-generation {
+  color: #b8e986;
+  border-color: #4a6a2a;
+  background: #1f2a12;
+}
+.cat-spell {
+  color: #d0a9ff;
+  border-color: #4a2a6a;
+  background: #231238;
 }
 .cat-other {
   color: #868e96;

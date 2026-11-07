@@ -543,6 +543,9 @@ export const zhCN = {
   'category.hero': '英雄',
   'category.enemy': '敌人',
   'category.level': '关卡',
+  'category.upgrade': '科技',
+  'category.generation': '代际',
+  'category.spell': '法术',
   'category.other': '其他',
   // ── 插件下载热度榜 ─────────────────────────────
   'rank.title': '插件下载热度榜',

@@ -26,6 +26,7 @@ const currentSort = ref('hot')
 const currentCategory = ref('')
 const currentSearch = ref('')
 const currentBranch = ref<'master' | 'dev'>('master')
+const onlyDeprecated = ref(false)
 const currentPage = ref(1)
 const totalPlugins = ref(0)
 const currentItems = ref<any[]>([])
@@ -201,6 +202,12 @@ function setBranch(branch: 'master' | 'dev') {
   fetchPage()
 }
 
+function toggleDeprecatedFilter() {
+  onlyDeprecated.value = !onlyDeprecated.value
+  currentPage.value = 1
+  fetchPage()
+}
+
 function onSearch() {
   if (_searchTimer.value) clearTimeout(_searchTimer.value)
   _searchTimer.value = setTimeout(() => {
@@ -221,6 +228,7 @@ async function fetchPage() {
   })
   if (currentCategory.value) params.set('category', currentCategory.value)
   if (currentSearch.value.trim()) params.set('q', currentSearch.value.trim())
+  if (onlyDeprecated.value) params.set('only_deprecated', 'true')
   try {
     const resp = await fetch('/plugins/list?' + params)
     if (resp.ok) {
@@ -2212,6 +2220,12 @@ watch(
           :class="{ active: currentBranch === 'dev' }"
           @click="setBranch('dev')"
         >{{ t('store.branch.dev') }}</button>
+        <button
+          type="button"
+          class="chip chip-deprecated"
+          :class="{ active: onlyDeprecated }"
+          @click="toggleDeprecatedFilter()"
+        >⛔ {{ t('store.filter.deprecated') }}</button>
       </div>
       <div class="category-chips" id="categoryChips">
         <button
@@ -3062,6 +3076,11 @@ watch(
   color: #000;
   border-color: var(--accent);
   font-weight: 600;
+}
+.chip-deprecated.active {
+  background: #7e4141;
+  border-color: #ffb4a8;
+  color: #ffe3de;
 }
 .chip-gameplay {
   --chip-c: #74c0fc;

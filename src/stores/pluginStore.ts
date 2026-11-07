@@ -29,6 +29,7 @@ export const usePluginStore = defineStore('pluginStore', () => {
   const currentCategory = ref('')
   const currentSearch = ref('')
   const currentBranch = ref<'master' | 'dev'>('master')
+  const onlyDeprecated = ref(false)
   const currentPage = ref(1)
   const totalPlugins = ref(0)
   const currentItems = ref<Plugin[]>([])
@@ -68,6 +69,7 @@ export const usePluginStore = defineStore('pluginStore', () => {
     })
     if (currentCategory.value) params.set('category', currentCategory.value)
     if (currentSearch.value.trim()) params.set('q', currentSearch.value.trim())
+    if (onlyDeprecated.value) params.set('only_deprecated', 'true')
     try {
       const resp = await fetch('/plugins/list?' + params)
       if (resp.ok) {
@@ -97,6 +99,12 @@ export const usePluginStore = defineStore('pluginStore', () => {
     fetchPage()
   }
 
+  function setOnlyDeprecated(value: boolean) {
+    onlyDeprecated.value = value
+    resetPage()
+    fetchPage()
+  }
+
   function onSearch(query: string) {
     currentSearch.value = query
     if (searchTimer) clearTimeout(searchTimer)
@@ -107,10 +115,10 @@ export const usePluginStore = defineStore('pluginStore', () => {
   }
 
   return {
-    currentSort, currentCategory, currentSearch, currentBranch, currentPage,
+    currentSort, currentCategory, currentSearch, currentBranch, onlyDeprecated, currentPage,
     totalPlugins, currentItems, loading,
     CATEGORIES, PAGE_SIZE, FEATURE_COLLECTIONS_UI,
     zipFile, coverFile,
-    fetchPage, setSort, setCategory, setBranch, onSearch, resetPage,
+    fetchPage, setSort, setCategory, setBranch, setOnlyDeprecated, onSearch, resetPage,
   }
 })

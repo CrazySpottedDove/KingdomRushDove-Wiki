@@ -474,6 +474,7 @@ export const zhCN = {
   'store.sort.hot': '🔥 热度',
   'store.sort.downloads': '⬇ 下载',
   'store.sort.newest': '🆕 最新',
+  'store.filter.deprecated': '只看已弃用',
   'store.filter.mine': '我发布的',
   'store.btn.view': '📄 查看',
   'store.btn.cover': '🎨 封面',

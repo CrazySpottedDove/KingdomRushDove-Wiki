@@ -475,6 +475,7 @@ export const en: Record<MessageKey, string> = {
   'store.sort.hot': '🔥 Hot',
   'store.sort.downloads': '⬇ Downloads',
   'store.sort.newest': '🆕 Newest',
+  'store.filter.deprecated': 'Deprecated only',
   'store.filter.mine': 'Published by me',
   'store.btn.view': '📄 View',
   'store.btn.cover': '🎨 Cover',

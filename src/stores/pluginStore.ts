@@ -46,6 +46,9 @@ export const usePluginStore = defineStore('pluginStore', () => {
     { slug: 'hero', icon: '🦸', get name() { return t('category.hero') } },
     { slug: 'enemy', icon: '👾', get name() { return t('category.enemy') } },
     { slug: 'level', icon: '🗺️', get name() { return t('category.level') } },
+    { slug: 'upgrade', icon: '⚙️', get name() { return t('category.upgrade') } },
+    { slug: 'generation', icon: '🧬', get name() { return t('category.generation') } },
+    { slug: 'spell', icon: '✨', get name() { return t('category.spell') } },
     { slug: 'other', icon: '📦', get name() { return t('category.other') } },
   ]
   const PAGE_SIZE = 15

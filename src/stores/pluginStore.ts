@@ -16,12 +16,19 @@ export interface Plugin {
   comment_count: number
   published_at: string
   has_cover: boolean
+  branch?: string
+  min_version?: string
+  deprecated?: boolean
+  deprecated_reason?: string
+  checked_at?: string
+  check_state?: string
 }
 
 export const usePluginStore = defineStore('pluginStore', () => {
   const currentSort = ref('hot')
   const currentCategory = ref('')
   const currentSearch = ref('')
+  const currentBranch = ref<'master' | 'dev'>('master')
   const currentPage = ref(1)
   const totalPlugins = ref(0)
   const currentItems = ref<Plugin[]>([])
@@ -57,6 +64,7 @@ export const usePluginStore = defineStore('pluginStore', () => {
       sort: currentSort.value,
       page: String(currentPage.value),
       limit: String(PAGE_SIZE),
+      branch: currentBranch.value,
     })
     if (currentCategory.value) params.set('category', currentCategory.value)
     if (currentSearch.value.trim()) params.set('q', currentSearch.value.trim())
@@ -83,6 +91,12 @@ export const usePluginStore = defineStore('pluginStore', () => {
     fetchPage()
   }
 
+  function setBranch(branch: 'master' | 'dev') {
+    currentBranch.value = branch
+    resetPage()
+    fetchPage()
+  }
+
   function onSearch(query: string) {
     currentSearch.value = query
     if (searchTimer) clearTimeout(searchTimer)
@@ -93,10 +107,10 @@ export const usePluginStore = defineStore('pluginStore', () => {
   }
 
   return {
-    currentSort, currentCategory, currentSearch, currentPage,
+    currentSort, currentCategory, currentSearch, currentBranch, currentPage,
     totalPlugins, currentItems, loading,
     CATEGORIES, PAGE_SIZE, FEATURE_COLLECTIONS_UI,
     zipFile, coverFile,
-    fetchPage, setSort, setCategory, onSearch, resetPage,
+    fetchPage, setSort, setCategory, setBranch, onSearch, resetPage,
   }
 })

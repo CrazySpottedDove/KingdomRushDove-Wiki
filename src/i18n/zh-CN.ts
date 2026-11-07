@@ -371,6 +371,10 @@ export const zhCN = {
   // ── 插件商店 / 整合包 ───────────────────
   'store.title.plugins': '🧩 插件商店',
   'store.title.packs': '📦 整合包商店',
+  'store.branch.master': '正式版 (master)',
+  'store.branch.dev': '开发版 (dev)',
+  'store.deprecated.label': '已弃用',
+  'store.deprecated.reason': '与当前游戏版本不兼容，已禁止安装',
   'store.tab.plugins': '插件',
   'store.tab.packs': '整合包',
   'store.tab.plaza': '整合包广场',

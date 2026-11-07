@@ -372,6 +372,10 @@ export const en: Record<MessageKey, string> = {
   // ── Plugin store / packs ─────────────────
   'store.title.plugins': '🧩 Plugin Store',
   'store.title.packs': '📦 Pack Store',
+  'store.branch.master': 'Release (master)',
+  'store.branch.dev': 'Development (dev)',
+  'store.deprecated.label': 'Deprecated',
+  'store.deprecated.reason': 'Incompatible with the current game version; installation disabled',
   'store.tab.plugins': 'Plugins',
   'store.tab.packs': 'Packs',
   'store.tab.plaza': 'Pack Plaza',

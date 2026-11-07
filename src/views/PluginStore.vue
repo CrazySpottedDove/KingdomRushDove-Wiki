@@ -25,6 +25,7 @@ const PAGE_SIZE = 15
 const currentSort = ref('hot')
 const currentCategory = ref('')
 const currentSearch = ref('')
+const currentBranch = ref<'master' | 'dev'>('master')
 const currentPage = ref(1)
 const totalPlugins = ref(0)
 const currentItems = ref<any[]>([])
@@ -193,6 +194,13 @@ function setSort(mode: string) {
   fetchPage()
 }
 
+function setBranch(branch: 'master' | 'dev') {
+  if (currentBranch.value === branch) return
+  currentBranch.value = branch
+  currentPage.value = 1
+  fetchPage()
+}
+
 function onSearch() {
   if (_searchTimer.value) clearTimeout(_searchTimer.value)
   _searchTimer.value = setTimeout(() => {
@@ -209,6 +217,7 @@ async function fetchPage() {
     sort: currentSort.value,
     page: String(currentPage.value),
     limit: String(PAGE_SIZE),
+    branch: currentBranch.value,
   })
   if (currentCategory.value) params.set('category', currentCategory.value)
   if (currentSearch.value.trim()) params.set('q', currentSearch.value.trim())
@@ -291,7 +300,13 @@ function renderCardHtml(p: any): string {
   const deleteBtn = canModify(p)
     ? `<button class="btn-sm btn-danger-sm" onclick="window.__openDelete('${entry}')">${t('challenge.btn.delete')}</button>`
     : ''
-  return `<div class="plugin-card" id="card-${entry}">
+  const deprecated = p.deprecated === true
+  const branchName = p.branch === 'dev' ? 'dev' : 'master'
+  const branchBadge = `<span class="card-branch card-branch-${branchName}">${branchName}</span>`
+  const downloadBtn = deprecated
+    ? `<button class="btn-sm btn-download-sm" disabled title="${t('store.deprecated.reason')}">⛔ ${t('store.deprecated.label')}</button>`
+    : `<a class="btn-sm btn-download-sm" href="/plugins/download/${filename}?branch=${encodeURIComponent(currentBranch.value)}">⬇ ${t('common.download')}</a>`
+  return `<div class="plugin-card${deprecated ? ' plugin-card-deprecated' : ''}" id="card-${entry}">
     ${coverHtml}
     <div class="card-body">
       <div class="card-meta-row">
@@ -311,12 +326,14 @@ function renderCardHtml(p: any): string {
         </div>
       </div>
       <div class="card-title" title="${pname}">${pname}</div>
+      ${deprecated ? `<div class="card-deprecated-badge">⛔ ${t('store.deprecated.label')}</div>` : ''}
       <div class="card-author">
         <a href="/developer/${encodeURIComponent(p.by)}" class="author-avatar-link" title="${t('store.author.home', { name: pby })}">
           <img src="/api/users/${encodeURIComponent(p.by)}/avatar" alt="${pby}" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='👤';" />
         </a>
         <a href="/developer/${encodeURIComponent(p.by)}" class="author-link" title="${t('store.author.view', { name: pby })}">${pby}</a>
         <span class="card-version">v${version}</span>
+        ${branchBadge}
       </div>
       <div class="card-desc">${desc}</div>
     </div>
@@ -329,7 +346,7 @@ function renderCardHtml(p: any): string {
       <div class="card-actions">
         <button class="btn-sm btn-detail-sm"  onclick="window.__showDetail('${entry}')">📄 ${t('dev.detail')}</button>
         <button class="btn-sm btn-comment-sm" onclick="window.__showComments('${entry}')">💬 ${t('common.comments')}</button>
-        <a class="btn-sm btn-download-sm"     href="/plugins/download/${filename}">⬇ ${t('common.download')}</a>
+        ${downloadBtn}
         ${deleteBtn}
       </div>
     </div>
@@ -2182,6 +2199,20 @@ watch(
 
     <!-- ── Filter & Sort ── -->
     <div class="filter-section" v-show="storeView === 'plugins'">
+      <div class="branch-chips">
+        <button
+          type="button"
+          class="chip"
+          :class="{ active: currentBranch === 'master' }"
+          @click="setBranch('master')"
+        >{{ t('store.branch.master') }}</button>
+        <button
+          type="button"
+          class="chip"
+          :class="{ active: currentBranch === 'dev' }"
+          @click="setBranch('dev')"
+        >{{ t('store.branch.dev') }}</button>
+      </div>
       <div class="category-chips" id="categoryChips">
         <button
           v-for="c in CATEGORIES"
@@ -2999,6 +3030,12 @@ watch(
 .filter-section {
   margin-bottom: 14px;
 }
+.branch-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
 .category-chips {
   display: flex;
   gap: 6px;
@@ -3164,6 +3201,20 @@ watch(
   transform: translateY(-2px);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
   border-color: #4a4d57;
+}
+.plugin-card-deprecated {
+  border-color: #6e3b3b;
+  opacity: 0.86;
+}
+.card-deprecated-badge {
+  display: inline-block;
+  margin: 6px 0 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: #ffb4a8;
+  background: #3d1d1d;
+  border: 1px solid #7e4141;
 }
 .card-cover {
   width: 100%;
@@ -3340,6 +3391,24 @@ watch(
   color: var(--text-dim);
   font-size: 0.75rem;
 }
+.card-branch {
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  text-transform: lowercase;
+}
+.card-branch-master {
+  color: #8fd3ff;
+  border-color: #2d6f8a;
+  background: #102a35;
+}
+.card-branch-dev {
+  color: #ffd58a;
+  border-color: #8a6a2d;
+  background: #352a10;
+}
 .card-desc {
   font-size: 0.8rem;
   color: var(--text-dim);
@@ -3386,6 +3455,14 @@ watch(
   background: #2a2b31;
   color: var(--text);
   text-decoration: none;
+}
+.btn-sm:disabled,
+.btn-sm[disabled] {
+  cursor: not-allowed;
+  opacity: 0.65;
+  color: #ffb4a8;
+  border-color: #7e4141;
+  background: #3d1d1d;
 }
 .btn-detail-sm {
   border-color: #2d8ca8;

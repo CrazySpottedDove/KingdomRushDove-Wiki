@@ -3661,6 +3661,22 @@ watch(
 }
 .modal.large {
   max-width: 860px;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+}
+.modal.large .modal-header {
+  flex-shrink: 0;
+}
+.modal.large .readme-plugin-info {
+  flex-shrink: 0;
+  max-height: 38vh;
+  overflow-y: auto;
+}
+.modal.large .modal-body {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 .modal-header {
   display: flex;
@@ -3830,7 +3846,7 @@ watch(
 .detail-deprecated-trace {
   margin: 0;
   padding: 10px;
-  max-height: 260px;
+  max-height: 180px;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;

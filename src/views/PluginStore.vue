@@ -105,6 +105,38 @@ const showCommentsModal = ref(false)
 const detailTitle = ref('')
 const detailPluginInfoHtml = ref('')
 const detailContentHtml = ref('')
+let _detailDeprecatedReason = ''
+
+async function copyDeprecatedReason(ev?: Event) {
+  const text = _detailDeprecatedReason
+  const btn = (ev?.target as HTMLElement | null) || null
+  if (!text) return
+
+  let ok = false
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      ok = true
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+  } catch {
+    ok = false
+  }
+
+  if (btn) {
+    const old = btn.textContent
+    btn.textContent = ok ? `📋 ${t('store.deprecated.copied')}` : `📋 ${t('store.deprecated.copy_failed')}`
+    setTimeout(() => { btn.textContent = old }, 1500)
+  }
+}
 
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalPlugins.value / PAGE_SIZE)))
@@ -153,6 +185,7 @@ onMounted(() => {
   w.__toggleLike = (e: Event, entry: string) => toggleLike(e, entry)
   w.__showDetail = (entry: string) => showDetail(entry)
   w.__showComments = (entry: string) => showComments(entry)
+  w.__copyDeprecatedReason = (ev: Event) => copyDeprecatedReason(ev)
   w.__toggleUser = () => toggleUser()
   w.__openDelete = (entry: string) => openDelete(entry)
   w.__confirmDelete = () => confirmDelete()
@@ -168,6 +201,7 @@ onUnmounted(() => {
   delete (window as any).__toggleLike
   delete (window as any).__showDetail
   delete (window as any).__showComments
+  delete (window as any).__copyDeprecatedReason
   delete (window as any).__toggleUser
   delete (window as any).__openDelete
   delete (window as any).__confirmDelete
@@ -369,6 +403,7 @@ function renderCardHtml(p: any): string {
 ;(window as any).__toggleFavorite = (event: Event, entry: string) => toggleFavorite(event, entry)
 ;(window as any).__toggleLike = (event: Event, entry: string) => toggleLike(event, entry)
 ;(window as any).__showDetail = (entry: string) => showDetail(entry)
+;(window as any).__copyDeprecatedReason = (ev: Event) => copyDeprecatedReason(ev)
 ;(window as any).__showComments = (entry: string) => showComments(entry)
 
 function closeModal(id: string) {
@@ -667,9 +702,12 @@ async function showDetail(entry: string) {
   const cat = getCategory(plugin.category)
   const deprecated = plugin.deprecated === true
   const deprecatedReason = typeof plugin.deprecated_reason === 'string' ? plugin.deprecated_reason.trim() : ''
+  _detailDeprecatedReason = deprecatedReason
   const deprecatedHtml = deprecated
     ? `<div class="detail-deprecated">
-        <div class="detail-deprecated-title">⛔ ${t('store.deprecated.label')}</div>
+        <div class="detail-deprecated-title">⛔ ${t('store.deprecated.label')}${deprecatedReason
+          ? `<button class="btn-sm detail-deprecated-copy" onclick="window.__copyDeprecatedReason(event)">📋 ${t('store.deprecated.copy')}</button>`
+          : ''}</div>
         <div class="detail-deprecated-hint">${t('store.deprecated.reason')}</div>
         ${deprecatedReason
           ? `<pre class="detail-deprecated-trace">${escHtml(deprecatedReason)}</pre>`
@@ -3835,9 +3873,15 @@ watch(
   margin-bottom: 6px;
 }
 .detail-deprecated-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #ffb4a8;
   font-weight: 700;
   margin-bottom: 4px;
+}
+.detail-deprecated-copy {
+  margin-left: auto;
 }
 .detail-deprecated-hint {
   color: var(--text-dim);

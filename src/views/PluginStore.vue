@@ -312,10 +312,12 @@ function renderCardHtml(p: any): string {
     ? `<button class="btn-sm btn-danger-sm" onclick="window.__openDelete('${entry}')">${t('challenge.btn.delete')}</button>`
     : ''
   const deprecated = p.deprecated === true
+  const deprecatedReason = typeof p.deprecated_reason === 'string' ? p.deprecated_reason.trim() : ''
+  const deprecatedTitle = deprecatedReason ? escHtml(deprecatedReason) : t('store.deprecated.reason')
   const branchName = p.branch === 'dev' ? 'dev' : 'master'
   const branchBadge = `<span class="card-branch card-branch-${branchName}">${branchName}</span>`
   const downloadBtn = deprecated
-    ? `<button class="btn-sm btn-download-sm" disabled title="${t('store.deprecated.reason')}">⛔ ${t('store.deprecated.label')}</button>`
+    ? `<button class="btn-sm btn-download-sm" disabled title="${deprecatedTitle}">⛔ ${t('store.deprecated.label')}</button>`
     : `<a class="btn-sm btn-download-sm" href="/plugins/download/${filename}?branch=${encodeURIComponent(currentBranch.value)}">⬇ ${t('common.download')}</a>`
   return `<div class="plugin-card${deprecated ? ' plugin-card-deprecated' : ''}" id="card-${entry}">
     ${coverHtml}
@@ -337,7 +339,7 @@ function renderCardHtml(p: any): string {
         </div>
       </div>
       <div class="card-title" title="${pname}">${pname}</div>
-      ${deprecated ? `<div class="card-deprecated-badge">⛔ ${t('store.deprecated.label')}</div>` : ''}
+      ${deprecated ? `<div class="card-deprecated-badge">⛔ ${t('store.deprecated.label')}<a href="javascript:void(0)" class="deprecated-reason-link" onclick="window.__showDetail('${entry}')">${t('store.deprecated.view_reason')}</a></div>` : ''}
       <div class="card-author">
         <a href="/developer/${encodeURIComponent(p.by)}" class="author-avatar-link" title="${t('store.author.home', { name: pby })}">
           <img src="/api/users/${encodeURIComponent(p.by)}/avatar" alt="${pby}" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='👤';" />
@@ -663,7 +665,18 @@ async function showDetail(entry: string) {
   if (!plugin) return
   detailTitle.value = plugin.name
   const cat = getCategory(plugin.category)
-  detailPluginInfoHtml.value = `<div><span>${t('dev.field.version')}</span><br><strong>${escHtml(plugin.version)}</strong></div>
+  const deprecated = plugin.deprecated === true
+  const deprecatedReason = typeof plugin.deprecated_reason === 'string' ? plugin.deprecated_reason.trim() : ''
+  const deprecatedHtml = deprecated
+    ? `<div class="detail-deprecated">
+        <div class="detail-deprecated-title">⛔ ${t('store.deprecated.label')}</div>
+        <div class="detail-deprecated-hint">${t('store.deprecated.reason')}</div>
+        ${deprecatedReason
+          ? `<pre class="detail-deprecated-trace">${escHtml(deprecatedReason)}</pre>`
+          : `<div class="detail-deprecated-empty">${t('store.deprecated.no_reason')}</div>`}
+      </div>`
+    : ''
+  detailPluginInfoHtml.value = `${deprecatedHtml}<div><span>${t('dev.field.version')}</span><br><strong>${escHtml(plugin.version)}</strong></div>
     <div><span>${t('dev.field.author')}</span><br><a href="/developer/${encodeURIComponent(plugin.by)}" target="_blank" style="color:var(--accent2)">${escHtml(plugin.by)}</a></div>
     <div><span>${t('dev.field.category')}</span><br><strong>${cat.icon} ${escHtml(cat.name)}</strong></div>
     <div><span>${t('dev.field.downloads')}</span><br><strong>${plugin.downloads}</strong></div>
@@ -3262,6 +3275,14 @@ watch(
   background: #3d1d1d;
   border: 1px solid #7e4141;
 }
+.card-deprecated-badge .deprecated-reason-link {
+  margin-left: 8px;
+  color: #ffd0c8;
+  text-decoration: underline;
+}
+.card-deprecated-badge .deprecated-reason-link:hover {
+  color: #fff;
+}
 .card-cover {
   width: 100%;
   aspect-ratio: 16/9;
@@ -3788,6 +3809,41 @@ watch(
 }
 .readme-plugin-info strong {
   color: var(--text);
+}
+.detail-deprecated {
+  grid-column: 1 / -1;
+  border: 1px solid #7e4141;
+  background: #2a1717;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+.detail-deprecated-title {
+  color: #ffb4a8;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.detail-deprecated-hint {
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.detail-deprecated-trace {
+  margin: 0;
+  padding: 10px;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #15161a;
+  border: 1px solid #3a3c44;
+  border-radius: 6px;
+  color: #f0d0c8;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.detail-deprecated-empty {
+  color: var(--text-dim);
+  font-style: italic;
 }
 
 /* ── Responsive ────────────────────────────────── */

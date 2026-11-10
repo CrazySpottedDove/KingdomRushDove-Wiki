@@ -30,10 +30,11 @@ return {
 	priority = 0, -- 插件启用优先级，若不知道可填 0
 	branch = "master", -- 可选：发布渠道，"master" 正式 / "dev" 开发预览
 	min_version = "2.0.7.8", -- 可选：运行本插件所需的最低本体版本。省略或留空表示不限制
+	release_version = "2.1.0.9", -- 可选，仅 branch = "dev" 生效：本体正式版达到该版本后自动转正式
 }
 ```
 
-除可选的 `min_version` 和 `branch` 外，每一条插件元数据都不可为 `nil`。
+除可选的 `min_version`、`branch` 和 `release_version` 外，每一条插件元数据都不可为 `nil`。
 
 ### min_version：限制本体最低版本
 
@@ -63,6 +64,34 @@ return {
 - 开发者预览版商店会同时拿到 master 和 dev 两个版本：dev 版本不低于 master 时展示 dev，否则展示 master；如果一方声明的 `min_version` 当前本体不满足，则优先展示兼容的那一方。
 - dev 条目的下载量固定为 0；有同名 master 条目时，评论、点赞、封面沿用 master 条目。
 - 只有 `branch = "master"` 的插件上传时才会询问 `cover.*` 封面。
+
+### release_version：dev 插件自动转正式
+
+`release_version` 是**可选**字段，且**只对 `branch = "dev"` 的插件生效**。它的值是一个点分本体版本号，与本体 `version.lua` 的 `id` 比较。
+
+当你把插件以 dev 渠道上传，并希望它在本体正式版达到某个版本后自动转正时，可以这样写：
+
+```lua
+return {
+	-- ...
+	branch = "dev",
+	release_version = "2.1.0.9",
+}
+```
+
+服务端在本体 `master` 分支收到更新推送时，会找出所有满足下面条件的 dev 插件：
+
+- `branch = "dev"`；
+- 填了 `release_version`；
+- 推送后的本体版本 **大于等于** `release_version`（例如本体发到 `2.1.0.9`，插件写 `2.1.0.9` 或更低）。
+
+随后服务端会对这些插件执行初始化测试（关卡插件还会进关卡实跑）。测试通过后会自动完成转正：
+
+- 插件包内 `config.lua` 的 `branch` 改为 `"master"`，并删除 `release_version`；
+- 作为正式版更新包发布到 master 渠道，玩家可正常更新；
+- dev 发布**不会删除**，只把其中的 `release_version` 擦除，避免重复晋升。
+
+测试未通过时 dev 发布保持原样，下一次本体 master 推送会再次尝试。省略 `release_version` 或留空表示永不自动转正；以 `branch = "master"` 上传时该字段会被忽略。
 
 ## 插件入口文件
 

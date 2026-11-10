@@ -18,6 +18,7 @@ export interface Plugin {
   has_cover: boolean
   branch?: string
   min_version?: string
+  release_version?: string
   deprecated?: boolean
   deprecated_reason?: string
   checked_at?: string

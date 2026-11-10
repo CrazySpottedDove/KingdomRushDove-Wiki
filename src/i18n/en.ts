@@ -374,6 +374,7 @@ export const en: Record<MessageKey, string> = {
   'store.title.packs': '📦 Pack Store',
   'store.branch.master': 'Release (master)',
   'store.branch.dev': 'Development (dev)',
+  'store.field.release_version': 'Release version',
   'store.deprecated.label': 'Deprecated',
   'store.deprecated.reason': 'Incompatible with the current game version; installation disabled',
   'store.deprecated.view_reason': 'View reason',

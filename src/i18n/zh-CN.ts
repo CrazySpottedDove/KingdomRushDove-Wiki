@@ -373,6 +373,7 @@ export const zhCN = {
   'store.title.packs': '📦 整合包商店',
   'store.branch.master': '正式版 (master)',
   'store.branch.dev': '开发版 (dev)',
+  'store.field.release_version': '转正版本',
   'store.deprecated.label': '已弃用',
   'store.deprecated.reason': '与当前游戏版本不兼容，已禁止安装',
   'store.deprecated.view_reason': '查看原因',

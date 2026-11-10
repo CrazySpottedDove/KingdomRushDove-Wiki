@@ -350,6 +350,10 @@ function renderCardHtml(p: any): string {
   const deprecatedTitle = deprecatedReason ? escHtml(deprecatedReason) : t('store.deprecated.reason')
   const branchName = p.branch === 'dev' ? 'dev' : 'master'
   const branchBadge = `<span class="card-branch card-branch-${branchName}">${branchName}</span>`
+  const releaseVersion = p.branch === 'dev' && p.release_version ? escHtml(p.release_version) : ''
+  const releaseBadge = releaseVersion
+    ? `<span class="card-release-version" title="${t('store.field.release_version')}">${t('store.field.release_version')} ${releaseVersion}</span>`
+    : ''
   const downloadBtn = deprecated
     ? `<button class="btn-sm btn-download-sm" disabled title="${deprecatedTitle}">⛔ ${t('store.deprecated.label')}</button>`
     : `<a class="btn-sm btn-download-sm" href="/plugins/download/${filename}?branch=${encodeURIComponent(currentBranch.value)}">⬇ ${t('common.download')}</a>`
@@ -381,6 +385,7 @@ function renderCardHtml(p: any): string {
         <a href="/developer/${encodeURIComponent(p.by)}" class="author-link" title="${t('store.author.view', { name: pby })}">${pby}</a>
         <span class="card-version">v${version}</span>
         ${branchBadge}
+        ${releaseBadge}
       </div>
       <div class="card-desc">${desc}</div>
     </div>
@@ -714,7 +719,11 @@ async function showDetail(entry: string) {
           : `<div class="detail-deprecated-empty">${t('store.deprecated.no_reason')}</div>`}
       </div>`
     : ''
+  const releaseHtml = plugin.branch === 'dev' && plugin.release_version
+    ? `<div><span>${t('store.field.release_version')}</span><br><strong>${escHtml(plugin.release_version)}</strong></div>`
+    : ''
   detailPluginInfoHtml.value = `${deprecatedHtml}<div><span>${t('dev.field.version')}</span><br><strong>${escHtml(plugin.version)}</strong></div>
+    ${releaseHtml}
     <div><span>${t('dev.field.author')}</span><br><a href="/developer/${encodeURIComponent(plugin.by)}" target="_blank" style="color:var(--accent2)">${escHtml(plugin.by)}</a></div>
     <div><span>${t('dev.field.category')}</span><br><strong>${cat.icon} ${escHtml(cat.name)}</strong></div>
     <div><span>${t('dev.field.downloads')}</span><br><strong>${plugin.downloads}</strong></div>
@@ -2666,7 +2675,7 @@ watch(
           >
             <div style="min-width: 0;">
               <div style="font-weight: 600;">{{ item.name }}</div>
-              <div style="font-size: 0.8rem; color: var(--text-dim);">{{ item.entry }} · v{{ item.version }}</div>
+              <div style="font-size: 0.8rem; color: var(--text-dim);">{{ item.entry }} · v{{ item.version }}<span v-if="item.release_version"> · {{ t('store.field.release_version') }} {{ item.release_version }}</span></div>
             </div>
             <button class="btn-sm btn-danger-sm" @click="openDevDelete(item)">{{ t('challenge.btn.delete') }}</button>
           </div>
@@ -3537,6 +3546,15 @@ watch(
   color: #ffd58a;
   border-color: #8a6a2d;
   background: #352a10;
+}
+.card-release-version {
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #9fe4a6;
+  border: 1px solid #3f7a48;
+  background: #14301a;
 }
 .card-desc {
   font-size: 0.8rem;

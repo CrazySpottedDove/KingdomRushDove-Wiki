@@ -56,6 +56,10 @@ const userErr = ref('')
 const adminTokenInput = ref('')
 const adminErr = ref('')
 const adminSubmitting = ref(false)
+const selectedPluginEntries = ref<Set<string>>(new Set())
+const batchDeprecateReason = ref('')
+const batchDeprecateStatus = ref('')
+const batchDeprecateBusy = ref(false)
 const collectionName = ref('')
 const collectionDesc = ref('')
 const collectionEntries = ref('')
@@ -189,6 +193,7 @@ onMounted(() => {
   w.__toggleUser = () => toggleUser()
   w.__openDelete = (entry: string) => openDelete(entry)
   w.__confirmDelete = () => confirmDelete()
+  w.__togglePluginSelect = (ev: Event, entry: string) => togglePluginSelection(ev, entry)
   w.__setCollectionsFilter = (mode: string) => setCollectionsFilter(mode)
   w.__toggleCollectionFollow = (id: number, followed: boolean) => toggleCollectionFollow(id, followed)
   w.__deleteCollection = (id: number, name: string) => deleteCollection(id, name)
@@ -205,6 +210,7 @@ onUnmounted(() => {
   delete (window as any).__toggleUser
   delete (window as any).__openDelete
   delete (window as any).__confirmDelete
+  delete (window as any).__togglePluginSelect
   delete (window as any).__setCollectionsFilter
   delete (window as any).__toggleCollectionFollow
   delete (window as any).__deleteCollection
@@ -255,6 +261,7 @@ function onSearch() {
 
 async function fetchPage() {
   if (!pluginGridRef.value) return
+  selectedPluginEntries.value = new Set()
   pluginGridRef.value.innerHTML =
     '<div class="grid-loading" style="grid-column:1/-1;padding:48px;text-align:center;color:#666">' + t('common.loading') + '</div>'
   const params = new URLSearchParams({
@@ -357,7 +364,15 @@ function renderCardHtml(p: any): string {
   const downloadBtn = deprecated
     ? `<button class="btn-sm btn-download-sm" disabled title="${deprecatedTitle}">⛔ ${t('store.deprecated.label')}</button>`
     : `<a class="btn-sm btn-download-sm" href="/plugins/download/${filename}?branch=${encodeURIComponent(currentBranch.value)}">⬇ ${t('common.download')}</a>`
-  return `<div class="plugin-card${deprecated ? ' plugin-card-deprecated' : ''}" id="card-${entry}">
+  const selected = selectedPluginEntries.value.has(p.entry)
+  const selectBox = auth.adminToken
+    ? `<label class="card-select" title="${t('store.admin.select_plugin')}">
+         <input type="checkbox" data-plugin-entry="${entry}" ${selected ? 'checked' : ''}
+           onchange="window.__togglePluginSelect(event,'${entry}')" />
+       </label>`
+    : ''
+  return `<div class="plugin-card${deprecated ? ' plugin-card-deprecated' : ''}${selected ? ' plugin-card-selected' : ''}" id="card-${entry}">
+    ${selectBox}
     ${coverHtml}
     <div class="card-body">
       <div class="card-meta-row">
@@ -538,6 +553,89 @@ async function confirmAdmin() {
     adminErr.value = t('store.network_error_retry')
   } finally {
     adminSubmitting.value = false
+  }
+}
+
+// ── Admin batch deprecation ──
+function pluginSelectBoxes(): HTMLInputElement[] {
+  return Array.from(
+    pluginGridRef.value?.querySelectorAll<HTMLInputElement>('input[data-plugin-entry]') || [],
+  )
+}
+
+function syncPluginSelectionDom() {
+  for (const box of pluginSelectBoxes()) {
+    const entry = box.dataset.pluginEntry || ''
+    box.checked = selectedPluginEntries.value.has(entry)
+    box.closest('.plugin-card')?.classList.toggle('plugin-card-selected', box.checked)
+  }
+}
+
+function togglePluginSelection(ev: Event, entry: string) {
+  const target = ev.target as HTMLInputElement | null
+  const next = new Set(selectedPluginEntries.value)
+  if (target?.checked) next.add(entry)
+  else next.delete(entry)
+  selectedPluginEntries.value = next
+  syncPluginSelectionDom()
+}
+
+function selectAllCurrentPage() {
+  selectedPluginEntries.value = new Set(currentItems.value.map((p: any) => p.entry))
+  syncPluginSelectionDom()
+}
+
+function clearPluginSelection() {
+  selectedPluginEntries.value = new Set()
+  batchDeprecateStatus.value = ''
+  syncPluginSelectionDom()
+}
+
+async function batchSetDeprecation(deprecated: boolean) {
+  if (!auth.adminToken) return
+  const selected = currentItems.value.filter((p: any) => selectedPluginEntries.value.has(p.entry))
+  if (!selected.length) {
+    batchDeprecateStatus.value = t('store.admin.batch_none')
+    return
+  }
+  const message = deprecated
+    ? t('store.admin.batch_deprecate_confirm', { count: selected.length })
+    : t('store.admin.batch_undeprecate_confirm', { count: selected.length })
+  if (!window.confirm(message)) return
+
+  batchDeprecateBusy.value = true
+  batchDeprecateStatus.value = t('store.admin.batch_working')
+  try {
+    const resp = await fetch('/plugins/admin/deprecation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...auth.adminHeaders(),
+      },
+      body: JSON.stringify({
+        items: selected.map((p: any) => ({
+          entry: p.entry,
+          branch: p.branch === 'dev' ? 'dev' : 'master',
+        })),
+        view_branch: currentBranch.value,
+        deprecated,
+        reason: deprecated ? batchDeprecateReason.value.trim() : '',
+      }),
+    })
+    if (!resp.ok) {
+      if (resp.status === 401) auth.clearAdminToken()
+      batchDeprecateStatus.value = '❌ ' + (await resp.text())
+      return
+    }
+    const data = await resp.json()
+    clearPluginSelection()
+    await fetchPage()
+    batchDeprecateStatus.value = t('store.admin.batch_done', { count: data.updated || selected.length })
+    setTimeout(() => { batchDeprecateStatus.value = '' }, 3000)
+  } catch (e: any) {
+    batchDeprecateStatus.value = t('common.network_error_detail', { error: e.message })
+  } finally {
+    batchDeprecateBusy.value = false
   }
 }
 
@@ -2347,6 +2445,36 @@ watch(
       </div>
     </div>
 
+    <!-- ── Admin batch deprecation ── -->
+    <div class="admin-batch-bar" v-if="auth.isAdmin && storeView === 'plugins'">
+      <div class="admin-batch-info">
+        ⛔ {{ t('store.admin.batch_title') }}
+        <strong>{{ t('store.admin.batch_selected', { count: selectedPluginEntries.size }) }}</strong>
+      </div>
+      <div class="admin-batch-actions">
+        <button class="btn-sm" @click="selectAllCurrentPage()">{{ t('store.admin.select_all') }}</button>
+        <button class="btn-sm" :disabled="!selectedPluginEntries.size" @click="clearPluginSelection()">{{ t('store.admin.clear_selection') }}</button>
+        <input
+          type="text"
+          class="admin-batch-reason"
+          v-model="batchDeprecateReason"
+          maxlength="500"
+          :placeholder="t('store.admin.deprecate_reason')"
+        />
+        <button
+          class="btn-sm btn-danger-sm"
+          :disabled="!selectedPluginEntries.size || batchDeprecateBusy"
+          @click="batchSetDeprecation(true)"
+        >⛔ {{ t('store.admin.batch_deprecate') }}</button>
+        <button
+          class="btn-sm"
+          :disabled="!selectedPluginEntries.size || batchDeprecateBusy"
+          @click="batchSetDeprecation(false)"
+        >✅ {{ t('store.admin.batch_undeprecate') }}</button>
+      </div>
+      <div class="admin-batch-status" v-if="batchDeprecateStatus">{{ batchDeprecateStatus }}</div>
+    </div>
+
     <!-- ── Plugin grid ── -->
     <div class="plugin-grid" id="pluginGrid" ref="pluginGridRef" v-show="storeView === 'plugins'"></div>
 
@@ -3292,6 +3420,7 @@ watch(
 
 /* ── Plugin card ───────────────────────────────── */
 .plugin-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -3302,6 +3431,66 @@ watch(
     transform 0.15s,
     box-shadow 0.15s,
     border-color 0.15s;
+}
+.plugin-card-selected {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 1px var(--accent2) inset;
+}
+.card-select {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+}
+.card-select input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent2);
+  cursor: pointer;
+}
+.admin-batch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--accent2);
+  border-radius: 8px;
+}
+.admin-batch-info {
+  font-size: 0.86rem;
+  color: var(--text);
+}
+.admin-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.admin-batch-reason {
+  width: 200px;
+  max-width: 100%;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+.admin-batch-status {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  color: var(--text-dim);
 }
 .plugin-card:hover {
   transform: translateY(-2px);

@@ -169,6 +169,7 @@ export const zhCN = {
   'challenge.network_error_detail': '❌ 网络错误：{error}',
   'challenge.network_error_detail_plain': '网络错误：{error}',
   'challenge.delete_confirm': '确认删除这个挑战？此操作不可撤销。',
+  'challenge.admin.hint': '输入管理员 Token，验证通过后可以删除任意挑战帖子。',
   'challenge.empty': '📭 暂无挑战',
   'challenge.card.meta': '作者：{author} · 发布：{date}',
   'challenge.like.liked': '💖 已赞',

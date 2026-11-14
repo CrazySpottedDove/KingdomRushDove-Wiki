@@ -170,6 +170,7 @@ export const en: Record<MessageKey, string> = {
   'challenge.network_error_detail': '❌ Network error: {error}',
   'challenge.network_error_detail_plain': 'Network error: {error}',
   'challenge.delete_confirm': 'Delete this challenge? This cannot be undone.',
+  'challenge.admin.hint': 'Enter the admin token; once verified you can delete any challenge post.',
   'challenge.empty': '📭 No challenges yet',
   'challenge.card.meta': 'By {author} · {date}',
   'challenge.like.liked': '💖 Liked',

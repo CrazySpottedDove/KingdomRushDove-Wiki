@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { mdToHtml } from '../utils/markdown'
 import { t } from '../i18n'
@@ -28,6 +28,12 @@ const regUsername = ref('')
 const regPassword = ref('')
 const userErr = ref('')
 
+const showAdminModal = ref(false)
+const adminTokenInput = ref('')
+const adminErr = ref('')
+const adminSubmitting = ref(false)
+const adminTokenInputRef = ref<HTMLInputElement | null>(null)
+
 const showCommentsModal = ref(false)
 const commentChallengeId = ref<number | null>(null)
 const commentChallengeTitle = ref('')
@@ -40,6 +46,8 @@ const commentStatusColor = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalChallenges.value / PAGE_SIZE)))
+
+const adminBtnLabel = computed(() => (auth.adminToken ? t('store.admin.exit') : t('store.admin.enter')))
 
 function fmtDate(s: string | null | undefined): string {
   return s ? s.slice(0, 16).replace('T', ' ') : '—'
@@ -101,6 +109,42 @@ function toggleUser() {
   regPassword.value = ''
   userTab.value = 'login'
   showUserModal.value = true
+}
+
+function toggleAdmin() {
+  if (auth.adminToken) {
+    auth.clearAdminToken()
+    return
+  }
+  adminErr.value = ''
+  adminTokenInput.value = ''
+  showAdminModal.value = true
+  nextTick(() => adminTokenInputRef.value?.focus())
+}
+
+async function confirmAdmin() {
+  const token = adminTokenInput.value.trim()
+  if (!token) {
+    adminErr.value = t('store.admin.token_required')
+    return
+  }
+  adminSubmitting.value = true
+  adminErr.value = ''
+  try {
+    const resp = await fetch('/api/admin/traffic?hours=1&days=1', {
+      headers: { 'X-Admin-Token': token },
+    })
+    if (!resp.ok) {
+      adminErr.value = resp.status === 401 ? t('store.admin.bad_token') : t('store.admin.verify_failed')
+      return
+    }
+    auth.setAdminToken(token)
+    showAdminModal.value = false
+  } catch {
+    adminErr.value = t('store.network_error_retry')
+  } finally {
+    adminSubmitting.value = false
+  }
 }
 
 function switchUserTab(tab: 'login' | 'register') {
@@ -184,10 +228,11 @@ async function deleteChallenge(id: number) {
   try {
     const resp = await fetch(`/challenges/${id}`, {
       method: 'DELETE',
-      headers: auth.bearerHeaders(),
+      headers: { ...auth.bearerHeaders(), ...auth.adminHeaders() },
     })
     if (!resp.ok) {
       if (resp.status === 401) auth.clearUserAuth()
+      if (resp.status === 401 || resp.status === 403) auth.clearAdminToken()
       alert('❌ ' + (await resp.text()))
       return
     }
@@ -292,6 +337,9 @@ onMounted(async () => {
     <div class="top-bar">
       <h1>{{ t('challenge.title') }}</h1>
       <div class="top-bar-actions">
+        <button class="btn btn-admin" :class="{ active: auth.isAdmin }" @click="toggleAdmin">
+          {{ adminBtnLabel }}
+        </button>
         <button class="btn" :class="{ active: auth.isLoggedIn }" @click="toggleUser">
           {{ auth.isLoggedIn ? t('challenge.hero.logged_in', { name: auth.userAuth!.username }) : t('challenge.hero.login') }}
         </button>
@@ -359,7 +407,7 @@ onMounted(async () => {
             <div class="card-actions">
               <button class="btn btn-sm btn-like" :class="{ liked: auth.myLikes.has(c.id) }" @click="toggleLike(c.id)">{{ auth.myLikes.has(c.id) ? t('challenge.like.liked') : t('challenge.like.like') }}</button>
               <button class="btn btn-sm" @click="openComments(c.id, c.title)">{{ t('challenge.btn.comments') }}</button>
-              <button v-if="auth.userAuth?.username === c.author" class="btn btn-sm btn-danger" @click="deleteChallenge(c.id)">{{ t('challenge.btn.delete') }}</button>
+              <button v-if="auth.isAdmin || auth.userAuth?.username === c.author" class="btn btn-sm btn-danger" @click="deleteChallenge(c.id)">{{ t('challenge.btn.delete') }}</button>
             </div>
           </div>
         </div>
@@ -406,6 +454,31 @@ onMounted(async () => {
           </div>
         </template>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" :class="{ show: showAdminModal }" @click.self="showAdminModal = false">
+    <div class="modal" style="width: min(440px, 96vw)">
+      <div class="modal-header">
+        <h3>{{ t('store.admin.title') }}</h3>
+        <button class="modal-close" @click="showAdminModal = false">×</button>
+      </div>
+      <p class="publish-hint" style="margin-top:0;">{{ t('challenge.admin.hint') }}</p>
+      <label>{{ t('store.admin.token_placeholder') }}</label>
+      <input
+        ref="adminTokenInputRef"
+        type="password"
+        v-model="adminTokenInput"
+        :placeholder="t('store.admin.token_placeholder')"
+        @keydown.enter="confirmAdmin"
+      />
+      <div class="modal-btns">
+        <button class="btn" @click="showAdminModal = false">{{ t('common.cancel') }}</button>
+        <button class="btn btn-primary" :disabled="adminSubmitting" @click="confirmAdmin">
+          {{ adminSubmitting ? t('traffic.auth.submitting') : t('store.admin.confirm') }}
+        </button>
+      </div>
+      <div class="modal-err" v-if="adminErr">{{ adminErr }}</div>
     </div>
   </div>
 
@@ -459,6 +532,11 @@ onMounted(async () => {
 .top-bar-actions {
   display: flex;
   gap: 8px;
+}
+.btn-admin.active {
+  border-color: var(--accent2);
+  background: #1c3150;
+  color: var(--accent2);
 }
 .notice-box {
   background: #1f2937;

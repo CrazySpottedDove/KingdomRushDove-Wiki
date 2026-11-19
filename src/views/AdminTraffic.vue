@@ -209,8 +209,7 @@ onMounted(load)
 
     <div v-if="error" class="notice" style="margin:16px 0;color:var(--danger)">{{ error }}</div>
 
-    <template>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;align-items:center">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;align-items:center">
         <div class="btn-group">
           <button
             v-for="h in hourOptions"
@@ -317,7 +316,6 @@ onMounted(load)
           </tbody>
         </table>
       </template>
-    </template>
   </div>
 </template>
 

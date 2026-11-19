@@ -15,6 +15,19 @@ interface LogResponse {
   truncated: boolean
 }
 
+interface CheckProgress {
+  branch: string
+  log: string
+  total: number
+  done: number
+  passed: number
+  failed: number
+  running: boolean
+  updated_ago_secs: number
+  current: string
+  failures: string[]
+}
+
 const auth = useAuthStore()
 const kind = ref<LogKind>('out')
 const date = ref('')
@@ -26,9 +39,18 @@ const adminTokenInput = ref('')
 const adminSubmitting = ref(false)
 const adminError = ref('')
 const autoRefresh = ref(false)
+const devProgress = ref<CheckProgress | null>(null)
+const masterProgress = ref<CheckProgress | null>(null)
 let timer: number | undefined
+let progressTimer: number | undefined
 
 const isCheckLog = computed(() => kind.value.startsWith('check'))
+const downloadUrl = computed(() => {
+  if (!data.value) return '#'
+  let url = `/api/admin/logs/download?kind=${kind.value}`
+  if (!isCheckLog.value) url += `&date=${date.value}`
+  return url
+})
 const lineOptions = [100, 200, 500, 1000, 2000]
 
 function fmtBytes(bytes: number): string {
@@ -160,8 +182,32 @@ function stopTimer() {
   }
 }
 
-onMounted(load)
-onUnmounted(stopTimer)
+async function loadProgress() {
+  try {
+    const [dev, master] = await Promise.all([
+      fetch('/api/admin/logs/progress?branch=dev').then(r => r.ok ? r.json() : null),
+      fetch('/api/admin/logs/progress?branch=master').then(r => r.ok ? r.json() : null),
+    ])
+    devProgress.value = dev
+    masterProgress.value = master
+  } catch {
+    // progress is best-effort
+  }
+}
+
+function progressPct(p: CheckProgress | null): number {
+  return p && p.total > 0 ? Math.min(100, Math.round(p.done * 100 / p.total)) : 0
+}
+
+onMounted(() => {
+  load()
+  loadProgress()
+  progressTimer = window.setInterval(loadProgress, 10000)
+})
+onUnmounted(() => {
+  stopTimer()
+  if (progressTimer !== undefined) window.clearInterval(progressTimer)
+})
 </script>
 
 <template>
@@ -170,6 +216,27 @@ onUnmounted(stopTimer)
       <h1>🗒 {{ t('logs.title') }}</h1>
       <p>{{ t('logs.subtitle') }}</p>
     </header>
+
+    <section class="progress-grid">
+      <div v-for="(p, i) in [devProgress, masterProgress]" :key="i" class="progress-card">
+        <div class="progress-head">
+          <strong>{{ t('logs.progress.title') }} · {{ p?.branch || '—' }}</strong>
+          <span :class="{ running: p?.running }">
+            {{ p?.running ? t('logs.progress.running') : t('logs.progress.idle') }}
+          </span>
+        </div>
+        <template v-if="p && p.total > 0">
+          <div class="progress-bar"><div :style="{ width: progressPct(p) + '%' }"></div></div>
+          <div class="progress-meta">
+            {{ t('logs.progress.count', { done: p.done, total: p.total }) }}
+            · PASS {{ p.passed }} · FAIL {{ p.failed }}
+          </div>
+          <div v-if="p.current" class="progress-current">{{ t('logs.progress.current') }}: {{ p.current }}</div>
+          <div v-for="f in p.failures.slice(-3)" :key="f" class="progress-fail">{{ f }}</div>
+        </template>
+        <div v-else class="progress-current">{{ t('logs.progress.none') }}</div>
+      </div>
+    </section>
 
     <div class="btn-group" style="margin:16px 0 8px">
       <button class="btn" :class="{ active: kind === 'out' }" @click="setKind('out')">{{ t('logs.kind.out') }}</button>
@@ -198,6 +265,7 @@ onUnmounted(stopTimer)
         >{{ t('logs.last_lines', { count: n }) }}</button>
       </div>
       <button class="btn btn-primary" :disabled="loading" @click="load">{{ t('common.refresh') }}</button>
+      <a v-if="data" class="btn" :href="downloadUrl" download>{{ t('logs.download') }}</a>
       <button class="btn" :class="{ active: autoRefresh }" @click="toggleAuto">{{ t('logs.auto_refresh') }}</button>
       <button v-if="auth.isAdmin" class="btn btn-danger" :disabled="loading" @click="deleteLog">{{ t('logs.delete') }}</button>
       <span v-if="data" style="color:var(--text-dim);font-size:.9rem">
@@ -257,6 +325,42 @@ onUnmounted(stopTimer)
   background: var(--surface);
   color: var(--text);
 }
+.progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin: 16px 0 8px;
+}
+.progress-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.progress-head .running { color: var(--accent); }
+.progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: #2a2b31;
+  overflow: hidden;
+}
+.progress-bar > div {
+  height: 100%;
+  background: var(--accent);
+  transition: width .3s ease;
+}
+.progress-meta, .progress-current, .progress-fail {
+  margin-top: 8px;
+  font-size: .85rem;
+  color: var(--text-dim);
+}
+.progress-fail { color: var(--danger); }
 .log-view {
   margin: 12px 0 0;
   padding: 14px;

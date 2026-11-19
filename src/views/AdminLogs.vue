@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { t } from '../i18n'
 
-type LogKind = 'out' | 'err'
+type LogKind = 'out' | 'err' | 'check-dev' | 'check-master'
 
 interface LogResponse {
   kind: string
@@ -23,6 +23,8 @@ const adminTokenInput = ref('')
 const adminSubmitting = ref(false)
 const autoRefresh = ref(false)
 let timer: number | undefined
+
+const isCheckLog = computed(() => kind.value.startsWith('check'))
 
 const lineOptions = [100, 200, 500, 1000, 2000]
 
@@ -74,8 +76,9 @@ async function load() {
 }
 
 async function clearLog() {
-  if (!auth.adminToken) return
-  if (!window.confirm(t('logs.clear_confirm', { kind: t(`logs.kind.${kind.value}`) }))) return
+  if (!auth.adminToken || isCheckLog.value) return
+  const label = kind.value === 'err' ? t('logs.kind.err') : t('logs.kind.out')
+  if (!window.confirm(t('logs.clear_confirm', { kind: label }))) return
   loading.value = true
   error.value = ''
   try {
@@ -165,6 +168,9 @@ onUnmounted(stopTimer)
       <div class="btn-group" style="margin:16px 0 8px">
         <button class="btn" :class="{ active: kind === 'out' }" @click="setKind('out')">{{ t('logs.kind.out') }}</button>
         <button class="btn" :class="{ active: kind === 'err' }" @click="setKind('err')">{{ t('logs.kind.err') }}</button>
+        <span style="width:16px"></span>
+        <button class="btn" :class="{ active: kind === 'check-dev' }" @click="setKind('check-dev')">{{ t('logs.kind.check_dev') }}</button>
+        <button class="btn" :class="{ active: kind === 'check-master' }" @click="setKind('check-master')">{{ t('logs.kind.check_master') }}</button>
       </div>
 
       <div style="display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;align-items:center">
@@ -179,9 +185,9 @@ onUnmounted(stopTimer)
         </div>
         <button class="btn btn-primary" :disabled="loading" @click="load">{{ t('common.refresh') }}</button>
         <button class="btn" :class="{ active: autoRefresh }" @click="toggleAuto">{{ t('logs.auto_refresh') }}</button>
-        <button class="btn btn-danger" :disabled="loading" @click="clearLog">{{ t('logs.clear') }}</button>
+        <button v-if="!isCheckLog" class="btn btn-danger" :disabled="loading" @click="clearLog">{{ t('logs.clear') }}</button>
         <span v-if="data" style="color:var(--text-dim);font-size:.9rem">
-          {{ t('logs.size', { size: fmtBytes(data.size) }) }}
+          <code>{{ data.path }}</code> · {{ t('logs.size', { size: fmtBytes(data.size) }) }}
           <template v-if="data.truncated"> · {{ t('logs.truncated') }}</template>
         </span>
       </div>

@@ -32,8 +32,8 @@ onMounted(async () => {
         <router-link to="/plugins">🧩 {{ t('nav.plugins') }}</router-link>
         <router-link to="/challenges">🏁 {{ t('nav.challenges') }}</router-link>
         <router-link to="/wiki">📰 {{ t('nav.wiki') }}</router-link>
-        <router-link v-if="auth.isAdmin" to="/admin/traffic">📊 {{ t('nav.traffic') }}</router-link>
-        <router-link v-if="auth.isAdmin" to="/admin/logs">🗒 {{ t('nav.logs') }}</router-link>
+        <router-link to="/admin/traffic">📊 {{ t('nav.traffic') }}</router-link>
+        <router-link to="/admin/logs">🗒 {{ t('nav.logs') }}</router-link>
       </div>
       <select class="locale-switch" :value="locale" :aria-label="t('nav.language')" :title="t('nav.language')" @change="onLocaleChange">
         <option v-for="l in locales" :key="l.value" :value="l.value">{{ l.label }}</option>

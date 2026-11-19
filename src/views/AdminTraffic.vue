@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useAuthStore } from '../stores/auth'
 import TrafficLineChart from '../components/TrafficLineChart.vue'
 import { t, type MessageKey } from '../i18n'
 
@@ -35,14 +34,11 @@ interface TimePoint {
   bytes: number
 }
 
-const auth = useAuthStore()
 const hours = ref(24)
 const days = ref(7)
 const loading = ref(false)
 const error = ref('')
 const data = ref<StatsResponse | null>(null)
-const adminTokenInput = ref('')
-const adminSubmitting = ref(false)
 const chartMetric = ref<'count' | 'bytes'>('bytes')
 
 const hourOptions = [1, 6, 12, 24]
@@ -54,6 +50,7 @@ const interfaceDescriptions: Record<string, MessageKey> = {
   '/static': 'traffic.route./static',
   '/static/wiki': 'traffic.route./static/wiki',
   '/api/visits': 'traffic.route./api/visits',
+  '/api/traffic': 'traffic.route./api/traffic',
   '/api/admin/traffic': 'traffic.route./api/admin/traffic',
   '/admin/traffic': 'traffic.route./admin/traffic',
   '/api/admin/logs': 'traffic.route./api/admin/logs',
@@ -173,27 +170,12 @@ function fmtBytes(bytes: number): string {
 }
 
 async function load() {
-  if (!auth.adminToken) {
-    await auth.restoreSession()
-  }
-  if (!auth.adminToken) {
-    error.value = t('traffic.need_admin')
-    data.value = null
-    return
-  }
   loading.value = true
   error.value = ''
   try {
-    const resp = await fetch(`/api/admin/traffic?hours=${hours.value}&days=${days.value}`, {
-      headers: auth.adminHeaders(),
-    })
+    const resp = await fetch(`/api/traffic?hours=${hours.value}&days=${days.value}`)
     if (!resp.ok) {
-      if (resp.status === 401) {
-        auth.clearAdminToken()
-        error.value = t('traffic.bad_token')
-      } else {
-        error.value = t('common.load_failed')
-      }
+      error.value = t('common.load_failed')
       data.value = null
       return
     }
@@ -203,20 +185,6 @@ async function load() {
   } finally {
     loading.value = false
   }
-}
-
-async function submitAdmin() {
-  const token = adminTokenInput.value.trim()
-  if (!token) {
-    error.value = t('traffic.token_required')
-    return
-  }
-  adminSubmitting.value = true
-  error.value = ''
-  auth.setAdminToken(token)
-  adminTokenInput.value = ''
-  await load()
-  adminSubmitting.value = false
 }
 
 function setHours(v: number) {
@@ -239,25 +207,9 @@ onMounted(load)
       <p>{{ t('traffic.subtitle') }}</p>
     </header>
 
-    <div v-if="!auth.isAdmin" class="admin-login" style="max-width:420px;margin:24px auto">
-      <h2 style="margin-top:0">🔑 {{ t('traffic.auth.title') }}</h2>
-      <p style="color:var(--text-dim);font-size:.9rem">{{ t('traffic.auth.hint') }}</p>
-      <input
-        v-model="adminTokenInput"
-        type="password"
-        :placeholder="t('traffic.auth.placeholder')"
-        style="width:100%;box-sizing:border-box;margin:12px 0;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:#fff"
-        @keydown.enter="submitAdmin"
-      />
-      <button class="btn btn-primary" style="width:100%" :disabled="adminSubmitting" @click="submitAdmin">
-        {{ adminSubmitting ? t('traffic.auth.submitting') : t('traffic.auth.submit') }}
-      </button>
-      <div v-if="error" style="margin-top:12px;color:var(--danger);font-size:.9rem">{{ error }}</div>
-    </div>
+    <div v-if="error" class="notice" style="margin:16px 0;color:var(--danger)">{{ error }}</div>
 
-    <div v-else-if="error" class="notice" style="margin:16px 0;color:var(--danger)">{{ error }}</div>
-
-    <template v-if="auth.isAdmin">
+    <template>
       <div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;align-items:center">
         <div class="btn-group">
           <button

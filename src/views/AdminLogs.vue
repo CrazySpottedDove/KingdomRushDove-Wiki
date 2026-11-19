@@ -8,6 +8,8 @@ type LogKind = 'out' | 'err' | 'check-dev' | 'check-master'
 interface LogResponse {
   kind: string
   path: string
+  date: string
+  dates: string[]
   size: number
   content: string
   truncated: boolean
@@ -15,17 +17,18 @@ interface LogResponse {
 
 const auth = useAuthStore()
 const kind = ref<LogKind>('out')
+const date = ref('')
 const lines = ref(200)
 const data = ref<LogResponse | null>(null)
 const loading = ref(false)
 const error = ref('')
 const adminTokenInput = ref('')
 const adminSubmitting = ref(false)
+const adminError = ref('')
 const autoRefresh = ref(false)
 let timer: number | undefined
 
 const isCheckLog = computed(() => kind.value.startsWith('check'))
-
 const lineOptions = [100, 200, 500, 1000, 2000]
 
 function fmtBytes(bytes: number): string {
@@ -40,26 +43,23 @@ function fmtBytes(bytes: number): string {
   return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${units[i]}`
 }
 
+function kindLabel(): string {
+  if (kind.value === 'err') return t('logs.kind.err')
+  if (kind.value === 'check-dev') return t('logs.kind.check_dev')
+  if (kind.value === 'check-master') return t('logs.kind.check_master')
+  return t('logs.kind.out')
+}
+
 async function load() {
-  if (!auth.adminToken) {
-    await auth.restoreSession()
-  }
-  if (!auth.adminToken) {
-    error.value = t('traffic.need_admin')
-    data.value = null
-    return
-  }
   loading.value = true
   error.value = ''
   try {
-    const resp = await fetch(`/api/admin/logs?kind=${kind.value}&lines=${lines.value}`, {
-      headers: auth.adminHeaders(),
-    })
+    let url = `/api/admin/logs?kind=${kind.value}&lines=${lines.value}`
+    if (!isCheckLog.value && date.value) url += `&date=${date.value}`
+
+    const resp = await fetch(url)
     if (!resp.ok) {
-      if (resp.status === 401) {
-        auth.clearAdminToken()
-        error.value = t('traffic.bad_token')
-      } else if (resp.status === 404) {
+      if (resp.status === 404) {
         error.value = t('logs.missing')
       } else {
         error.value = t('common.load_failed')
@@ -67,7 +67,9 @@ async function load() {
       data.value = null
       return
     }
-    data.value = await resp.json()
+    const result: LogResponse = await resp.json()
+    data.value = result
+    if (!isCheckLog.value && !date.value) date.value = result.date
   } catch {
     error.value = t('common.network_error')
   } finally {
@@ -75,19 +77,27 @@ async function load() {
   }
 }
 
-async function clearLog() {
-  if (!auth.adminToken || isCheckLog.value) return
-  const label = kind.value === 'err' ? t('logs.kind.err') : t('logs.kind.out')
-  if (!window.confirm(t('logs.clear_confirm', { kind: label }))) return
+async function deleteLog() {
+  if (!auth.adminToken || !data.value) return
+  const when = isCheckLog.value ? data.value.path : date.value
+  const label = `${kindLabel()} ${when}`
+  if (!window.confirm(t('logs.delete_confirm', { target: label }))) return
   loading.value = true
   error.value = ''
   try {
-    const resp = await fetch(`/api/admin/logs?kind=${kind.value}`, {
+    let url = `/api/admin/logs?kind=${kind.value}`
+    if (!isCheckLog.value) url += `&date=${date.value}`
+    const resp = await fetch(url, {
       method: 'DELETE',
       headers: auth.adminHeaders(),
     })
     if (!resp.ok) {
-      error.value = resp.status === 401 ? t('traffic.bad_token') : t('logs.clear_failed')
+      if (resp.status === 401) {
+        auth.clearAdminToken()
+        error.value = t('traffic.bad_token')
+      } else {
+        error.value = t('logs.delete_failed')
+      }
       return
     }
     await load()
@@ -101,19 +111,32 @@ async function clearLog() {
 async function submitAdmin() {
   const token = adminTokenInput.value.trim()
   if (!token) {
-    error.value = t('traffic.token_required')
+    adminError.value = t('traffic.token_required')
     return
   }
   adminSubmitting.value = true
-  error.value = ''
-  auth.setAdminToken(token)
-  adminTokenInput.value = ''
-  await load()
-  adminSubmitting.value = false
+  adminError.value = ''
+  try {
+    const resp = await fetch('/api/admin/traffic?hours=1&days=1', {
+      headers: { 'X-Admin-Token': token },
+    })
+    if (!resp.ok) {
+      adminError.value = resp.status === 401 ? t('traffic.bad_token') : t('common.load_failed')
+      return
+    }
+    auth.setAdminToken(token)
+    adminTokenInput.value = ''
+    await load()
+  } catch {
+    adminError.value = t('common.network_error')
+  } finally {
+    adminSubmitting.value = false
+  }
 }
 
 function setKind(v: LogKind) {
   kind.value = v
+  if (v.startsWith('check')) date.value = ''
   load()
 }
 
@@ -148,64 +171,91 @@ onUnmounted(stopTimer)
       <p>{{ t('logs.subtitle') }}</p>
     </header>
 
-    <div v-if="!auth.isAdmin" class="admin-login" style="max-width:420px;margin:24px auto">
-      <h2 style="margin-top:0">🔑 {{ t('traffic.auth.title') }}</h2>
-      <p style="color:var(--text-dim);font-size:.9rem">{{ t('traffic.auth.hint') }}</p>
+    <div class="btn-group" style="margin:16px 0 8px">
+      <button class="btn" :class="{ active: kind === 'out' }" @click="setKind('out')">{{ t('logs.kind.out') }}</button>
+      <button class="btn" :class="{ active: kind === 'err' }" @click="setKind('err')">{{ t('logs.kind.err') }}</button>
+      <span style="width:16px"></span>
+      <button class="btn" :class="{ active: kind === 'check-dev' }" @click="setKind('check-dev')">{{ t('logs.kind.check_dev') }}</button>
+      <button class="btn" :class="{ active: kind === 'check-master' }" @click="setKind('check-master')">{{ t('logs.kind.check_master') }}</button>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;align-items:center">
+      <div v-if="!isCheckLog && data" class="btn-group">
+        <span style="font-size:.9rem;color:var(--text-dim)">{{ t('logs.date') }}</span>
+        <select v-model="date" class="log-date" @change="load">
+          <option v-for="(d, i) in data.dates" :key="d" :value="d">
+            {{ i === 0 ? t('logs.today') : d }}
+          </option>
+        </select>
+      </div>
+      <div class="btn-group">
+        <button
+          v-for="n in lineOptions"
+          :key="n"
+          class="btn"
+          :class="{ active: lines === n }"
+          @click="setLines(n)"
+        >{{ t('logs.last_lines', { count: n }) }}</button>
+      </div>
+      <button class="btn btn-primary" :disabled="loading" @click="load">{{ t('common.refresh') }}</button>
+      <button class="btn" :class="{ active: autoRefresh }" @click="toggleAuto">{{ t('logs.auto_refresh') }}</button>
+      <button v-if="auth.isAdmin" class="btn btn-danger" :disabled="loading" @click="deleteLog">{{ t('logs.delete') }}</button>
+      <span v-if="data" style="color:var(--text-dim);font-size:.9rem">
+        <code>{{ data.path }}</code> · {{ t('logs.size', { size: fmtBytes(data.size) }) }}
+        <template v-if="data.truncated"> · {{ t('logs.truncated') }}</template>
+      </span>
+    </div>
+
+    <div v-if="!auth.isAdmin" class="admin-bar">
+      <span>{{ t('logs.admin_hint') }}</span>
       <input
         v-model="adminTokenInput"
         type="password"
-        :placeholder="t('traffic.auth.placeholder')"
-        style="width:100%;box-sizing:border-box;margin:12px 0;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:#fff"
+        :placeholder="t('store.admin.token_placeholder')"
         @keydown.enter="submitAdmin"
       />
-      <button class="btn btn-primary" style="width:100%" :disabled="adminSubmitting" @click="submitAdmin">
-        {{ adminSubmitting ? t('traffic.auth.submitting') : t('traffic.auth.submit') }}
+      <button class="btn" :disabled="adminSubmitting" @click="submitAdmin">
+        {{ adminSubmitting ? t('traffic.auth.submitting') : t('store.admin.confirm') }}
       </button>
-      <div v-if="error" style="margin-top:12px;color:var(--danger);font-size:.9rem">{{ error }}</div>
+      <span v-if="adminError" style="color:var(--danger)">{{ adminError }}</span>
     </div>
 
-    <template v-if="auth.isAdmin">
-      <div class="btn-group" style="margin:16px 0 8px">
-        <button class="btn" :class="{ active: kind === 'out' }" @click="setKind('out')">{{ t('logs.kind.out') }}</button>
-        <button class="btn" :class="{ active: kind === 'err' }" @click="setKind('err')">{{ t('logs.kind.err') }}</button>
-        <span style="width:16px"></span>
-        <button class="btn" :class="{ active: kind === 'check-dev' }" @click="setKind('check-dev')">{{ t('logs.kind.check_dev') }}</button>
-        <button class="btn" :class="{ active: kind === 'check-master' }" @click="setKind('check-master')">{{ t('logs.kind.check_master') }}</button>
-      </div>
+    <div v-if="error" class="notice" style="margin:12px 0;color:var(--danger)">{{ error }}</div>
+    <div v-if="loading && !data" style="padding:40px;text-align:center;color:var(--text-dim)">{{ t('common.loading') }}</div>
 
-      <div style="display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;align-items:center">
-        <div class="btn-group">
-          <button
-            v-for="n in lineOptions"
-            :key="n"
-            class="btn"
-            :class="{ active: lines === n }"
-            @click="setLines(n)"
-          >{{ t('logs.last_lines', { count: n }) }}</button>
-        </div>
-        <button class="btn btn-primary" :disabled="loading" @click="load">{{ t('common.refresh') }}</button>
-        <button class="btn" :class="{ active: autoRefresh }" @click="toggleAuto">{{ t('logs.auto_refresh') }}</button>
-        <button v-if="!isCheckLog" class="btn btn-danger" :disabled="loading" @click="clearLog">{{ t('logs.clear') }}</button>
-        <span v-if="data" style="color:var(--text-dim);font-size:.9rem">
-          <code>{{ data.path }}</code> · {{ t('logs.size', { size: fmtBytes(data.size) }) }}
-          <template v-if="data.truncated"> · {{ t('logs.truncated') }}</template>
-        </span>
-      </div>
-
-      <div v-if="error" class="notice" style="margin:12px 0;color:var(--danger)">{{ error }}</div>
-      <div v-if="loading && !data" style="padding:40px;text-align:center;color:var(--text-dim)">{{ t('common.loading') }}</div>
-
-      <pre v-if="data" class="log-view">{{ data.content || t('logs.empty') }}</pre>
-    </template>
+    <pre v-if="data" class="log-view">{{ data.content || t('logs.empty') }}</pre>
   </div>
 </template>
 
 <style scoped>
-.btn-group { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.btn-group { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .btn.active {
   border-color: var(--accent);
   background: #2a2b31;
   color: #fff;
+}
+.log-date {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.admin-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 12px;
+  color: var(--text-dim);
+  font-size: .9rem;
+}
+.admin-bar input {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
 }
 .log-view {
   margin: 12px 0 0;

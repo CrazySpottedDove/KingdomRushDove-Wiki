@@ -389,6 +389,7 @@ export const en: Record<MessageKey, string> = {
   'logs.progress.running': 'Running',
   'logs.progress.idle': 'Finished',
   'logs.progress.count': '{done}/{total}',
+  'logs.progress.recorded': 'Recorded {done} entries (total unknown)',
   'logs.progress.current': 'Current',
   'logs.progress.none': 'No test records',
   'logs.admin_hint': 'Read-only. Enter the admin token to delete logs.',

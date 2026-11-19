@@ -19,6 +19,7 @@ interface CheckProgress {
   branch: string
   log: string
   total: number
+  total_known: boolean
   done: number
   passed: number
   failed: number
@@ -196,7 +197,7 @@ async function loadProgress() {
 }
 
 function progressPct(p: CheckProgress | null): number {
-  return p && p.total > 0 ? Math.min(100, Math.round(p.done * 100 / p.total)) : 0
+  return p && p.total_known && p.total > 0 ? Math.min(100, Math.round(p.done * 100 / p.total)) : 0
 }
 
 onMounted(() => {
@@ -225,10 +226,11 @@ onUnmounted(() => {
             {{ p?.running ? t('logs.progress.running') : t('logs.progress.idle') }}
           </span>
         </div>
-        <template v-if="p && p.total > 0">
-          <div class="progress-bar"><div :style="{ width: progressPct(p) + '%' }"></div></div>
+        <template v-if="p && p.done > 0">
+          <div v-if="p.total_known" class="progress-bar"><div :style="{ width: progressPct(p) + '%' }"></div></div>
           <div class="progress-meta">
-            {{ t('logs.progress.count', { done: p.done, total: p.total }) }}
+            <template v-if="p.total_known">{{ t('logs.progress.count', { done: p.done, total: p.total }) }}</template>
+            <template v-else>{{ t('logs.progress.recorded', { done: p.done }) }}</template>
             · PASS {{ p.passed }} · FAIL {{ p.failed }}
           </div>
           <div v-if="p.current" class="progress-current">{{ t('logs.progress.current') }}: {{ p.current }}</div>

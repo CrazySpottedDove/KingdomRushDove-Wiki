@@ -388,6 +388,7 @@ export const zhCN = {
   'logs.progress.running': '运行中',
   'logs.progress.idle': '已结束',
   'logs.progress.count': '{done}/{total}',
+  'logs.progress.recorded': '已记录 {done} 项（总数未知）',
   'logs.progress.current': '当前',
   'logs.progress.none': '暂无测试记录',
   'logs.admin_hint': '只读模式；输入管理员 Token 后可删除日志。',

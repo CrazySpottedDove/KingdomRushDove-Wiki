@@ -82,10 +82,11 @@ const metrics = computed(() => {
       try { return JSON.parse(line) as MetricsRecord } catch { return null }
     })
     .filter((record): record is MetricsRecord => record !== null)
+  const metricRecords = records.filter(record => record.categories)
   const categories = new Map<string, MetricsCategory>()
   const stages = new Map<string, MetricsStage & { category: string, name: string }>()
   const slowRequests: SlowRequest[] = []
-  for (const record of records) {
+  for (const record of metricRecords) {
     for (const [name, category] of Object.entries(record.categories || {})) {
       const current = categories.get(name) || {
         requests: 0, response_bytes: 0, total_ms: 0, max_ms: 0,
@@ -119,7 +120,7 @@ const metrics = computed(() => {
       .map(stage => ({ ...stage, avg_ms: stage.count ? stage.total_ms / stage.count : 0 }))
       .sort((a, b) => b.total_ms - a.total_ms),
     slowRequests: slowRequests.sort((a, b) => b.elapsed_ms - a.elapsed_ms).slice(0, 20),
-    recordCount: records.length,
+    recordCount: metricRecords.length,
   }
 })
 const downloadUrl = computed(() => {

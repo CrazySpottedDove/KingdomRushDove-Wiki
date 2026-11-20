@@ -21,18 +21,28 @@ interface MetricsStage {
   max_ms: number
 }
 
-interface MetricsRecord {
-  timestamp: number
+interface MetricsCategory {
   requests: number
   response_bytes: number
+  total_ms: number
+  max_ms: number
   download_requests: number
-  download_wait_ms: number
-  request_time_ms: number
-  file_cache_hits: number
-  file_cache_misses: number
-  bundle_cache_hits: number
-  bundle_cache_misses: number
-  stages?: Record<string, MetricsStage>
+  throttle_wait_ms: number
+}
+
+interface SlowRequest {
+  category: string
+  path: string
+  elapsed_ms: number
+  response_bytes: number
+  status: number
+}
+
+interface MetricsRecord {
+  timestamp: number
+  categories?: Record<string, MetricsCategory>
+  stages?: Record<string, Record<string, MetricsStage>>
+  slow_requests?: SlowRequest[]
 }
 
 interface CheckProgress {
@@ -59,10 +69,8 @@ const error = ref('')
 const adminTokenInput = ref('')
 const adminSubmitting = ref(false)
 const adminError = ref('')
-const autoRefresh = ref(false)
 const devProgress = ref<CheckProgress | null>(null)
 const masterProgress = ref<CheckProgress | null>(null)
-let timer: number | undefined
 let progressTimer: number | undefined
 
 const isCheckLog = computed(() => kind.value.startsWith('check'))
@@ -74,22 +82,44 @@ const metrics = computed(() => {
       try { return JSON.parse(line) as MetricsRecord } catch { return null }
     })
     .filter((record): record is MetricsRecord => record !== null)
-  const latest = records.length ? records[records.length - 1] : null
-  const stages = new Map<string, MetricsStage>()
+  const categories = new Map<string, MetricsCategory>()
+  const stages = new Map<string, MetricsStage & { category: string, name: string }>()
+  const slowRequests: SlowRequest[] = []
   for (const record of records) {
-    for (const [name, stage] of Object.entries(record.stages || {})) {
-      const current = stages.get(name) || { count: 0, total_ms: 0, max_ms: 0 }
+    for (const [name, category] of Object.entries(record.categories || {})) {
+      const current = categories.get(name) || {
+        requests: 0, response_bytes: 0, total_ms: 0, max_ms: 0,
+        download_requests: 0, throttle_wait_ms: 0,
+      }
+      current.requests += category.requests
+      current.response_bytes += category.response_bytes
+      current.total_ms += category.total_ms
+      current.max_ms = Math.max(current.max_ms, category.max_ms)
+      current.download_requests += category.download_requests
+      current.throttle_wait_ms += category.throttle_wait_ms
+      categories.set(name, current)
+    }
+    for (const [category, categoryStages] of Object.entries(record.stages || {})) {
+      for (const [name, stage] of Object.entries(categoryStages)) {
+        const key = `${category}.${name}`
+        const current = stages.get(key) || { category, name, count: 0, total_ms: 0, max_ms: 0 }
       current.count += stage.count
       current.total_ms += stage.total_ms
       current.max_ms = Math.max(current.max_ms, stage.max_ms)
-      stages.set(name, current)
+        stages.set(key, current)
+      }
     }
+    slowRequests.push(...(record.slow_requests || []))
   }
   return {
-    latest,
-    stages: [...stages.entries()]
-      .map(([name, stage]) => ({ name, ...stage, avg_ms: stage.count ? stage.total_ms / stage.count : 0 }))
+    categories: [...categories.entries()]
+      .map(([name, category]) => ({ name, ...category, avg_ms: category.requests ? category.total_ms / category.requests : 0 }))
       .sort((a, b) => b.total_ms - a.total_ms),
+    stages: [...stages.values()]
+      .map(stage => ({ ...stage, avg_ms: stage.count ? stage.total_ms / stage.count : 0 }))
+      .sort((a, b) => b.total_ms - a.total_ms),
+    slowRequests: slowRequests.sort((a, b) => b.elapsed_ms - a.elapsed_ms).slice(0, 20),
+    recordCount: records.length,
   }
 })
 const downloadUrl = computed(() => {
@@ -124,7 +154,8 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    let url = `/api/admin/logs?kind=${kind.value}&lines=${lines.value}`
+    const requestedLines = kind.value === 'metrics' ? 2000 : lines.value
+    let url = `/api/admin/logs?kind=${kind.value}&lines=${requestedLines}`
     if (!isCheckLog.value && date.value) url += `&date=${date.value}`
 
     const resp = await fetch(url)
@@ -215,21 +246,6 @@ function setLines(v: number) {
   load()
 }
 
-function toggleAuto() {
-  autoRefresh.value = !autoRefresh.value
-  stopTimer()
-  if (autoRefresh.value) {
-    timer = window.setInterval(load, 5000)
-  }
-}
-
-function stopTimer() {
-  if (timer !== undefined) {
-    window.clearInterval(timer)
-    timer = undefined
-  }
-}
-
 async function loadProgress() {
   try {
     const [dev, master] = await Promise.all([
@@ -253,7 +269,6 @@ onMounted(() => {
   progressTimer = window.setInterval(loadProgress, 10000)
 })
 onUnmounted(() => {
-  stopTimer()
   if (progressTimer !== undefined) window.clearInterval(progressTimer)
 })
 </script>
@@ -305,7 +320,7 @@ onUnmounted(() => {
           </option>
         </select>
       </div>
-      <div class="btn-group">
+      <div v-if="kind !== 'metrics'" class="btn-group">
         <button
           v-for="n in lineOptions"
           :key="n"
@@ -316,12 +331,12 @@ onUnmounted(() => {
       </div>
       <button class="btn btn-primary" :disabled="loading" @click="load">{{ t('common.refresh') }}</button>
       <a v-if="data" class="btn" :href="downloadUrl" download>{{ t('logs.download') }}</a>
-      <button class="btn" :class="{ active: autoRefresh }" @click="toggleAuto">{{ t('logs.auto_refresh') }}</button>
       <button v-if="auth.isAdmin" class="btn btn-danger" :disabled="loading" @click="deleteLog">{{ t('logs.delete') }}</button>
       <span v-if="data" style="color:var(--text-dim);font-size:.9rem">
         <code>{{ data.path }}</code> · {{ t('logs.size', { size: fmtBytes(data.size) }) }}
         <template v-if="data.truncated"> · {{ t('logs.truncated') }}</template>
       </span>
+      <span v-if="kind === 'metrics'" style="color:var(--text-dim);font-size:.9rem">按所选日期的全部采样记录聚合</span>
     </div>
 
     <div v-if="!auth.isAdmin" class="admin-bar">
@@ -342,25 +357,41 @@ onUnmounted(() => {
     <div v-if="loading && !data" style="padding:40px;text-align:center;color:var(--text-dim)">{{ t('common.loading') }}</div>
 
     <section v-if="metrics" class="metrics-view">
-      <div v-if="metrics.latest" class="metrics-cards">
-        <div class="metric-card"><span>请求数</span><strong>{{ metrics.latest.requests }}</strong></div>
-        <div class="metric-card"><span>响应流量</span><strong>{{ fmtBytes(metrics.latest.response_bytes) }}</strong></div>
-        <div class="metric-card"><span>下载请求</span><strong>{{ metrics.latest.download_requests }}</strong></div>
-        <div class="metric-card"><span>限流等待</span><strong>{{ metrics.latest.download_wait_ms }} ms</strong></div>
+      <div class="metrics-hint">共 {{ metrics.recordCount }} 个采样周期，按业务类型汇总</div>
+      <div v-if="metrics.categories.length" class="metrics-cards">
+        <div v-for="category in metrics.categories" :key="category.name" class="metric-card">
+          <span>{{ category.name === 'plugin' ? '插件相关' : category.name === 'update' ? '本体更新相关' : '网页相关' }}</span>
+          <strong>{{ category.requests }} 次请求</strong>
+          <small>{{ fmtBytes(category.response_bytes) }} · 平均 {{ category.avg_ms.toFixed(1) }} ms · 最大 {{ category.max_ms }} ms</small>
+        </div>
       </div>
-      <table class="metrics-table">
+      <table v-if="metrics.stages.length" class="metrics-table">
+        <caption>已埋点操作</caption>
         <thead><tr><th>阶段</th><th>次数</th><th>总耗时</th><th>平均耗时</th><th>最大耗时</th></tr></thead>
         <tbody>
           <tr v-for="stage in metrics.stages" :key="stage.name">
-            <td><code>{{ stage.name }}</code></td>
+            <td><code>{{ stage.category }} / {{ stage.name }}</code></td>
             <td>{{ stage.count }}</td>
             <td>{{ stage.total_ms.toFixed(0) }} ms</td>
             <td>{{ stage.avg_ms.toFixed(1) }} ms</td>
             <td>{{ stage.max_ms }} ms</td>
           </tr>
-          <tr v-if="!metrics.stages.length"><td colspan="5">暂无阶段数据</td></tr>
         </tbody>
       </table>
+      <table v-if="metrics.slowRequests.length" class="metrics-table slow-requests">
+        <caption>慢请求样本（每个采样周期最多保留 10 条）</caption>
+        <thead><tr><th>类型</th><th>路径</th><th>耗时</th><th>响应</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr v-for="request in metrics.slowRequests" :key="`${request.path}-${request.elapsed_ms}-${request.response_bytes}`">
+            <td>{{ request.category === 'plugin' ? '插件' : request.category === 'update' ? '更新' : '网页' }}</td>
+            <td><code>{{ request.path }}</code></td>
+            <td>{{ request.elapsed_ms }} ms</td>
+            <td>{{ fmtBytes(request.response_bytes) }}</td>
+            <td>{{ request.status }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="!metrics.categories.length && !metrics.slowRequests.length" class="metrics-empty">暂无性能数据</div>
     </section>
     <pre v-else-if="data" class="log-view">{{ data.content || t('logs.empty') }}</pre>
   </div>
@@ -447,11 +478,16 @@ onUnmounted(() => {
   word-break: break-word;
 }
 .metrics-view { margin-top: 12px; }
+.metrics-hint, .metrics-empty { margin: 8px 0 12px; color: var(--text-dim); font-size: .9rem; }
 .metrics-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
 .metric-card { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .metric-card span { display: block; color: var(--text-dim); font-size: .82rem; }
 .metric-card strong { display: block; margin-top: 5px; font-size: 1.2rem; }
+.metric-card small { display: block; margin-top: 6px; color: var(--text-dim); }
 .metrics-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+.metrics-table + .metrics-table { margin-top: 20px; }
+.metrics-table caption { padding: 8px 0; text-align: left; color: var(--text-dim); font-weight: 600; }
 .metrics-table th, .metrics-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: right; }
 .metrics-table th:first-child, .metrics-table td:first-child { text-align: left; }
+.slow-requests td:nth-child(2) { text-align: left; }
 </style>

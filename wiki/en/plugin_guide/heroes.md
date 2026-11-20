@@ -27,8 +27,8 @@ function hook:init(plugin_data)
         -- template name of the hero
 		name = "hero_x",
 		room = {
-            -- level that unlocks the hero
-			available_level = 1,
+            -- unlock condition: generation id + local level index within that generation
+			available = { mode = "level", gen = "kr1", level = 1 },
             -- stats shown in the hero room
 			stats = {5, 5, 5, 5},
             -- portrait texture (optional)
@@ -48,38 +48,39 @@ function hook:init(plugin_data)
 		sounds = {ENTRY .. ".assets.sounds.sounds"},
         -- sound group file
 		groups = {ENTRY .. ".assets.sounds.groups"},
-        -- base-game textures used in a match
-		required_textures = {},
-        -- plugin textures used in a match
-		plugin_required_textures = {
-			["go_hero_x"] = {
-				use_bytecode = false,
-				path = ENTRY .. "/assets/images"
+        -- resources are declared per scene; fields match that scene's required_* fields
+		resources = {
+            -- in-match resources
+			game = {
+				required_textures = {},
+				plugin_required_textures = {
+					["go_hero_x"] = {
+						use_bytecode = false,
+						path = ENTRY .. "/assets/images"
+					}
+				},
+				required_sounds = {},
+				plugin_required_sounds = {ENTRY .. "_hero_sounds"},
+				required_exoskeletons = {},
+				plugin_required_exoskeletons = {
+					["hero_x"] = {path = ENTRY .. "/assets/exoskeletons"}
+				}
+			},
+            -- world-map resources
+			map = {
+				required_textures = {},
+				plugin_required_textures = {
+					["hero_x_ui"] = {
+						use_bytecode = false,
+						path = ENTRY .. "/assets/images"
+					}
+				},
+				required_sounds = {},
+				plugin_required_sounds = {},
+				required_exoskeletons = {},
+				plugin_required_exoskeletons = {}
 			}
 		},
-        -- sounds used in a match
-		required_sounds = {},
-        -- plugin sounds used in a match
-		plugin_required_sounds = {ENTRY .. "_hero_sounds"},
-        -- base-game exoskeletons used in a match
-		required_exoskeletons = {},
-        -- plugin exoskeletons used in a match
-		plugin_required_exoskeletons = {
-			["hero_x"] = {path = ENTRY .. "/assets/exoskeletons"}
-		},
-        -- base-game textures used on the world map
-		screen_map_required_textures = {},
-        -- plugin textures used on the world map
-		screen_map_plugin_required_textures = {
-			["hero_x_ui"] = {
-				use_bytecode = false,
-				path = ENTRY .. "/assets/images"
-			}
-		},
-        -- base-game sounds used on the world map
-		screen_map_required_sounds = {},
-        -- plugin sounds used on the world map
-		screen_map_plugin_required_sounds = {},
         -- hero-name style in the hero room
 		name_style = {
 			margin = 0,
@@ -96,6 +97,10 @@ function hook:init(plugin_data)
 	})
 end
 ```
+
+- `room.available` describes the unlock condition with `gen` (generation id) and `level` (local level index within that generation); e.g. level 16 of `kr5` is `{ mode = "level", gen = "kr5", level = 16 }`. Use `{ mode = "default" }` to unlock immediately.
+- The old `room.available_level` (global level number) is no longer supported; if present, it logs an error and the hero is treated as unlocked by default.
+- Resources are declared under `resources.game` / `resources.map`, using the same fields as that scene's `required_*`; the old flat `required_textures` / `screen_map_*` fields have been removed.
 
 ## templates.lua
 

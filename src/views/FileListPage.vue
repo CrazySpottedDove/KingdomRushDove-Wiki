@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { escHtml } from '../utils/markdown'
 import { t, type MessageKey } from '../i18n'
@@ -64,9 +64,6 @@ watch(() => route.query.path, (path) => {
   fetchList(path as string || '')
 }, { immediate: true })
 
-onMounted(() => {
-  fetchList(route.query.path as string || '')
-})
 </script>
 
 <template>

@@ -374,6 +374,7 @@ export const zhCN = {
   'logs.subtitle': '公开查看服务端正常/错误日志与插件测试日志；删除需要管理员 Token',
   'logs.kind.out': '正常日志',
   'logs.kind.err': '错误日志',
+  'logs.kind.metrics': '性能指标',
   'logs.kind.check_dev': '测试日志 (dev)',
   'logs.kind.check_master': '测试日志 (master)',
   'logs.last_lines': '最近 {count} 行',

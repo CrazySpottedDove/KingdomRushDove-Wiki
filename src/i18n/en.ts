@@ -375,6 +375,7 @@ export const en: Record<MessageKey, string> = {
   'logs.subtitle': 'Public read of server stdout / stderr and plugin-check logs; deletion requires the admin token',
   'logs.kind.out': 'Normal log',
   'logs.kind.err': 'Error log',
+  'logs.kind.metrics': 'Performance metrics',
   'logs.kind.check_dev': 'Test log (dev)',
   'logs.kind.check_master': 'Test log (master)',
   'logs.last_lines': 'Last {count} lines',

@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { t } from '../i18n'
 
-type LogKind = 'out' | 'err' | 'check-dev' | 'check-master'
+type LogKind = 'out' | 'err' | 'metrics' | 'check-dev' | 'check-master'
 
 interface LogResponse {
   kind: string
@@ -68,6 +68,7 @@ function fmtBytes(bytes: number): string {
 
 function kindLabel(): string {
   if (kind.value === 'err') return t('logs.kind.err')
+  if (kind.value === 'metrics') return t('logs.kind.metrics')
   if (kind.value === 'check-dev') return t('logs.kind.check_dev')
   if (kind.value === 'check-master') return t('logs.kind.check_master')
   return t('logs.kind.out')
@@ -243,6 +244,7 @@ onUnmounted(() => {
     <div class="btn-group" style="margin:16px 0 8px">
       <button class="btn" :class="{ active: kind === 'out' }" @click="setKind('out')">{{ t('logs.kind.out') }}</button>
       <button class="btn" :class="{ active: kind === 'err' }" @click="setKind('err')">{{ t('logs.kind.err') }}</button>
+      <button class="btn" :class="{ active: kind === 'metrics' }" @click="setKind('metrics')">{{ t('logs.kind.metrics') }}</button>
       <span style="width:16px"></span>
       <button class="btn" :class="{ active: kind === 'check-dev' }" @click="setKind('check-dev')">{{ t('logs.kind.check_dev') }}</button>
       <button class="btn" :class="{ active: kind === 'check-master' }" @click="setKind('check-master')">{{ t('logs.kind.check_master') }}</button>

@@ -15,6 +15,26 @@ interface LogResponse {
   truncated: boolean
 }
 
+interface MetricsStage {
+  count: number
+  total_ms: number
+  max_ms: number
+}
+
+interface MetricsRecord {
+  timestamp: number
+  requests: number
+  response_bytes: number
+  download_requests: number
+  download_wait_ms: number
+  request_time_ms: number
+  file_cache_hits: number
+  file_cache_misses: number
+  bundle_cache_hits: number
+  bundle_cache_misses: number
+  stages?: Record<string, MetricsStage>
+}
+
 interface CheckProgress {
   branch: string
   log: string
@@ -46,6 +66,32 @@ let timer: number | undefined
 let progressTimer: number | undefined
 
 const isCheckLog = computed(() => kind.value.startsWith('check'))
+const metrics = computed(() => {
+  if (kind.value !== 'metrics' || !data.value) return null
+  const records = data.value.content
+    .split('\n')
+    .map(line => {
+      try { return JSON.parse(line) as MetricsRecord } catch { return null }
+    })
+    .filter((record): record is MetricsRecord => record !== null)
+  const latest = records.length ? records[records.length - 1] : null
+  const stages = new Map<string, MetricsStage>()
+  for (const record of records) {
+    for (const [name, stage] of Object.entries(record.stages || {})) {
+      const current = stages.get(name) || { count: 0, total_ms: 0, max_ms: 0 }
+      current.count += stage.count
+      current.total_ms += stage.total_ms
+      current.max_ms = Math.max(current.max_ms, stage.max_ms)
+      stages.set(name, current)
+    }
+  }
+  return {
+    latest,
+    stages: [...stages.entries()]
+      .map(([name, stage]) => ({ name, ...stage, avg_ms: stage.count ? stage.total_ms / stage.count : 0 }))
+      .sort((a, b) => b.total_ms - a.total_ms),
+  }
+})
 const downloadUrl = computed(() => {
   if (!data.value) return '#'
   let url = `/api/admin/logs/download?kind=${kind.value}`
@@ -295,7 +341,28 @@ onUnmounted(() => {
     <div v-if="error" class="notice" style="margin:12px 0;color:var(--danger)">{{ error }}</div>
     <div v-if="loading && !data" style="padding:40px;text-align:center;color:var(--text-dim)">{{ t('common.loading') }}</div>
 
-    <pre v-if="data" class="log-view">{{ data.content || t('logs.empty') }}</pre>
+    <section v-if="metrics" class="metrics-view">
+      <div v-if="metrics.latest" class="metrics-cards">
+        <div class="metric-card"><span>请求数</span><strong>{{ metrics.latest.requests }}</strong></div>
+        <div class="metric-card"><span>响应流量</span><strong>{{ fmtBytes(metrics.latest.response_bytes) }}</strong></div>
+        <div class="metric-card"><span>下载请求</span><strong>{{ metrics.latest.download_requests }}</strong></div>
+        <div class="metric-card"><span>限流等待</span><strong>{{ metrics.latest.download_wait_ms }} ms</strong></div>
+      </div>
+      <table class="metrics-table">
+        <thead><tr><th>阶段</th><th>次数</th><th>总耗时</th><th>平均耗时</th><th>最大耗时</th></tr></thead>
+        <tbody>
+          <tr v-for="stage in metrics.stages" :key="stage.name">
+            <td><code>{{ stage.name }}</code></td>
+            <td>{{ stage.count }}</td>
+            <td>{{ stage.total_ms.toFixed(0) }} ms</td>
+            <td>{{ stage.avg_ms.toFixed(1) }} ms</td>
+            <td>{{ stage.max_ms }} ms</td>
+          </tr>
+          <tr v-if="!metrics.stages.length"><td colspan="5">暂无阶段数据</td></tr>
+        </tbody>
+      </table>
+    </section>
+    <pre v-else-if="data" class="log-view">{{ data.content || t('logs.empty') }}</pre>
   </div>
 </template>
 
@@ -379,4 +446,12 @@ onUnmounted(() => {
   white-space: pre-wrap;
   word-break: break-word;
 }
+.metrics-view { margin-top: 12px; }
+.metrics-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.metric-card { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.metric-card span { display: block; color: var(--text-dim); font-size: .82rem; }
+.metric-card strong { display: block; margin-top: 5px; font-size: 1.2rem; }
+.metrics-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+.metrics-table th, .metrics-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: right; }
+.metrics-table th:first-child, .metrics-table td:first-child { text-align: left; }
 </style>

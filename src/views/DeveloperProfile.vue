@@ -14,6 +14,7 @@ interface DevData {
   display_name?: string
   avatar_filename?: string
   banner_filename?: string
+  donation_filename?: string
   bio_md?: string
   level: number
   level_name: string
@@ -71,6 +72,7 @@ const showLogin = ref(false)
 const loginUser = ref('')
 const loginPass = ref('')
 const loginErr = ref('')
+const showDonation = ref(false)
 
 async function loadProfile() {
   loading.value = true
@@ -371,6 +373,51 @@ function editBanner() {
   input.click()
 }
 
+function donationCodeUrl() {
+  return `/api/users/${encodeURIComponent(targetUser.value!)}/donation`
+}
+
+function uploadDonationCode() {
+  if (!isOwnProfile.value) return
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/png,image/jpeg,image/webp'
+  input.onchange = async () => {
+    const file = input.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      alert(t('dev.donation_too_large'))
+      return
+    }
+    try {
+      const resp = await fetch(donationCodeUrl(), {
+        method: 'POST',
+        headers: auth.bearerHeaders(),
+        body: file,
+      })
+      if (!resp.ok) alert(t('dev.donation_upload_failed', { error: await resp.text() }))
+      else await loadProfile()
+    } catch (e: any) {
+      alert(t('dev.donation_upload_failed', { error: e.message }))
+    }
+  }
+  input.click()
+}
+
+async function deleteDonationCode() {
+  if (!isOwnProfile.value || !confirm(t('dev.donation_delete_confirm'))) return
+  const resp = await fetch(donationCodeUrl(), {
+    method: 'DELETE',
+    headers: auth.bearerHeaders(),
+  })
+  if (resp.ok) {
+    showDonation.value = false
+    await loadProfile()
+  } else {
+    alert(t('dev.donation_upload_failed', { error: await resp.text() }))
+  }
+}
+
 function fmtDate(s: string) {
   return s ? s.slice(0, 10) : '—'
 }
@@ -479,6 +526,23 @@ onMounted(async () => {
         </div>
       </div>
 
+      <div v-if="devData.donation_filename || isOwnProfile" class="donation-section">
+        <div class="section-title">
+          💖 {{ t('dev.donation_title') }}
+          <button v-if="isOwnProfile" class="btn" style="padding:3px 10px;font-size:0.8rem" @click="uploadDonationCode">
+            {{ devData.donation_filename ? t('dev.donation_change') : t('dev.donation_upload') }}
+          </button>
+          <button v-if="isOwnProfile && devData.donation_filename" class="btn" style="padding:3px 10px;font-size:0.8rem" @click="deleteDonationCode">
+            {{ t('common.delete') }}
+          </button>
+        </div>
+        <div v-if="devData.donation_filename" class="donation-card">
+          <p>{{ t('dev.donation_hint') }}</p>
+          <button class="btn btn-primary" @click="showDonation = true">💖 {{ t('dev.donation_view') }}</button>
+        </div>
+        <div v-else-if="isOwnProfile" class="donation-empty">{{ t('dev.donation_empty') }}</div>
+      </div>
+
       <div>
         <div class="section-title">
           🧩 {{ t('dev.plugins_title') }}
@@ -563,6 +627,20 @@ onMounted(async () => {
       </div>
     </Teleport>
 
+    <!-- Donation code modal -->
+    <Teleport to="body">
+      <div class="modal-backdrop" :class="{ show: showDonation }" @click.self="showDonation = false">
+        <div class="modal donation-modal">
+          <div class="modal-header">
+            <h3>💖 {{ t('dev.donation_title') }}</h3>
+            <button class="modal-close" @click="showDonation = false">×</button>
+          </div>
+          <img v-if="showDonation && devData?.donation_filename" :src="donationCodeUrl() + '?t=' + devData.donation_filename" :alt="t('dev.donation_alt')" />
+          <p>{{ t('dev.donation_scan_hint') }}</p>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Comments modal -->
     <PluginCommentsModal
       v-model="showComments"
@@ -633,6 +711,12 @@ onMounted(async () => {
 .score-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 100%); transition: width .6s ease; }
 .level-milestones { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; }
 .bio-section { margin-bottom: 28px; }
+.donation-section { margin-bottom: 28px; }
+.donation-card { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+.donation-card p, .donation-empty { color: var(--text-dim); font-size: 0.88rem; margin: 0; }
+.donation-modal { max-width: 520px; text-align: center; }
+.donation-modal img { display: block; max-width: min(100%, 420px); max-height: 65vh; margin: 0 auto; object-fit: contain; background: #fff; border-radius: 6px; }
+.donation-modal p { color: var(--text-dim); margin: 14px 0 0; font-size: .86rem; }
 .section-title { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 .bio-content { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; line-height: 1.75; font-size: 0.9rem; min-height: 60px; }
 .bio-content.empty { color: var(--text-dim); font-style: italic; }
